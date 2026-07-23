@@ -85,3 +85,153 @@ fn test_cli_scan_fail_on() {
         "pfg scan --fail-on low should return exit code 1 when findings meet or exceed threshold"
     );
 }
+
+#[test]
+fn test_cli_clean_default() {
+    let temp_dir = std::env::temp_dir().join("pfg_cli_test_clean_default");
+    let _ = fs::remove_dir_all(&temp_dir);
+    fs::create_dir_all(&temp_dir).unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_pfg"))
+        .current_dir(get_workspace_root())
+        .args(&[
+            "clean",
+            "fixtures/images/sample.jpg",
+            "-o",
+            temp_dir.to_str().unwrap(),
+        ])
+        .output()
+        .expect("Failed to execute pfg binary");
+
+    assert!(output.status.success(), "pfg clean should succeed");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Clean Report") || stdout.contains("Clean Summary"));
+
+    let cleaned_file = temp_dir.join("sample.pfg.jpg");
+    assert!(cleaned_file.exists(), "Cleaned output file should be created");
+
+    let _ = fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_cli_clean_strict() {
+    let temp_dir = std::env::temp_dir().join("pfg_cli_test_clean_strict");
+    let _ = fs::remove_dir_all(&temp_dir);
+    fs::create_dir_all(&temp_dir).unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_pfg"))
+        .current_dir(get_workspace_root())
+        .args(&[
+            "clean",
+            "fixtures/images/sample.jpg",
+            "--profile",
+            "strict",
+            "-o",
+            temp_dir.to_str().unwrap(),
+        ])
+        .output()
+        .expect("Failed to execute pfg binary");
+
+    assert!(output.status.success(), "pfg clean --profile strict should succeed");
+
+    let cleaned_file = temp_dir.join("sample.pfg.jpg");
+    assert!(cleaned_file.exists(), "Cleaned output file should be created with strict profile");
+
+    let _ = fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_cli_clean_safe_name() {
+    let temp_dir = std::env::temp_dir().join("pfg_cli_test_clean_safe_name");
+    let _ = fs::remove_dir_all(&temp_dir);
+    fs::create_dir_all(&temp_dir).unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_pfg"))
+        .current_dir(get_workspace_root())
+        .args(&[
+            "clean",
+            "fixtures/images/sample.jpg",
+            "--safe-name",
+            "-o",
+            temp_dir.to_str().unwrap(),
+        ])
+        .output()
+        .expect("Failed to execute pfg binary");
+
+    assert!(output.status.success(), "pfg clean --safe-name should succeed");
+
+    let entries: Vec<_> = fs::read_dir(&temp_dir)
+        .unwrap()
+        .map(|r| r.unwrap().file_name().to_string_lossy().to_string())
+        .collect();
+
+    assert_eq!(entries.len(), 1, "Should create 1 file in output directory");
+    assert!(
+        entries[0].ends_with(".jpg") && entries[0] != "sample.pfg.jpg",
+        "Filename should be hash-based safe name, found: {}",
+        entries[0]
+    );
+
+    let _ = fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_cli_verify_clean() {
+    let temp_dir = std::env::temp_dir().join("pfg_cli_test_verify_clean");
+    let _ = fs::remove_dir_all(&temp_dir);
+    fs::create_dir_all(&temp_dir).unwrap();
+
+    let clean_output = Command::new(env!("CARGO_BIN_EXE_pfg"))
+        .current_dir(get_workspace_root())
+        .args(&[
+            "clean",
+            "fixtures/images/sample.jpg",
+            "-o",
+            temp_dir.to_str().unwrap(),
+        ])
+        .output()
+        .expect("Failed to execute pfg clean");
+    assert!(clean_output.status.success());
+
+    let cleaned_file = temp_dir.join("sample.pfg.jpg");
+
+    let verify_output = Command::new(env!("CARGO_BIN_EXE_pfg"))
+        .current_dir(get_workspace_root())
+        .args(&[
+            "verify",
+            "fixtures/images/sample.jpg",
+            cleaned_file.to_str().unwrap(),
+        ])
+        .output()
+        .expect("Failed to execute pfg verify");
+
+    assert_eq!(
+        verify_output.status.code(),
+        Some(0),
+        "pfg verify on clean file should exit with code 0"
+    );
+    let stdout = String::from_utf8_lossy(&verify_output.stdout);
+    assert!(stdout.contains("Verification Report"));
+
+    let _ = fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_cli_verify_fail() {
+    let verify_output = Command::new(env!("CARGO_BIN_EXE_pfg"))
+        .current_dir(get_workspace_root())
+        .args(&[
+            "verify",
+            "fixtures/images/sample.jpg",
+            "fixtures/images/sample.jpg",
+        ])
+        .output()
+        .expect("Failed to execute pfg verify");
+
+    assert_eq!(
+        verify_output.status.code(),
+        Some(6),
+        "pfg verify on uncleaned file should exit with code 6"
+    );
+}
+

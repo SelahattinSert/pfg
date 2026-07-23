@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::process;
 
 use clap::{Parser, Subcommand, ValueEnum};
-use pfg_core::{scan_file, ScanOptions};
+use pfg_core::{clean_file, scan_file, verify_files, CleanOptions, CleanProfile, ScanOptions};
 use pfg_model::Severity;
 
 #[derive(Parser)]
@@ -38,6 +38,33 @@ enum Commands {
         #[arg(long = "include-values")]
         include_values: bool,
     },
+
+    /// Clean privacy-sensitive metadata from a file
+    Clean {
+        /// Path to target file
+        path: PathBuf,
+
+        /// Sanitization profile (balanced or strict)
+        #[arg(long = "profile", default_value = "balanced")]
+        profile: ProfileArg,
+
+        /// Output directory for sanitized file
+        #[arg(short = 'o', long = "output-dir")]
+        output_dir: Option<PathBuf>,
+
+        /// Use SHA-256 hash based safe filename
+        #[arg(long = "safe-name")]
+        safe_name: bool,
+    },
+
+    /// Verify that a cleaned file contains no residual sensitive metadata
+    Verify {
+        /// Path to original file
+        original: PathBuf,
+
+        /// Path to cleaned file
+        cleaned: PathBuf,
+    },
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
@@ -45,6 +72,22 @@ enum Commands {
 enum OutputFormat {
     Text,
     Json,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+#[value(rename_all = "lowercase")]
+enum ProfileArg {
+    Balanced,
+    Strict,
+}
+
+impl From<ProfileArg> for CleanProfile {
+    fn from(arg: ProfileArg) -> Self {
+        match arg {
+            ProfileArg::Balanced => CleanProfile::Balanced,
+            ProfileArg::Strict => CleanProfile::Strict,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
@@ -146,5 +189,61 @@ fn main() {
                 }
             }
         }
+        Commands::Clean {
+            path,
+            profile,
+            output_dir,
+            safe_name,
+        } => {
+            let options = CleanOptions {
+                profile: profile.into(),
+                output_dir,
+                safe_name,
+                overwrite: true,
+            };
+
+            match clean_file(&path, &options) {
+                Ok(report) => {
+                    println!("Privacy File Guard Clean Report");
+                    println!("==============================");
+                    println!("Original SHA256: {}", report.original_sha256);
+                    println!("Cleaned SHA256:  {}", report.cleaned_sha256);
+                    println!("Original Findings: {}", report.original_findings_count);
+                    println!("Cleaned Findings:  {}", report.cleaned_findings_count);
+                    println!("Verified Clean: {}", report.verified_clean);
+                    println!("Assurance Level: {}", report.assurance_level);
+                    process::exit(0);
+                }
+                Err(e) => {
+                    eprintln!("Clean error: {}", e);
+                    process::exit(5);
+                }
+            }
+        }
+        Commands::Verify { original, cleaned } => {
+            match verify_files(&original, &cleaned) {
+                Ok(report) => {
+                    println!("Privacy File Guard Verification Report");
+                    println!("=====================================");
+                    println!("Original SHA256: {}", report.original_sha256);
+                    println!("Cleaned SHA256:  {}", report.cleaned_sha256);
+                    println!("Original Findings: {}", report.original_findings_count);
+                    println!("Cleaned Findings:  {}", report.cleaned_findings_count);
+                    println!("Verified Clean: {}", report.verified_clean);
+                    println!("Assurance Level: {}", report.assurance_level);
+
+                    if report.verified_clean {
+                        process::exit(0);
+                    } else {
+                        process::exit(6);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Verification error: {}", e);
+                    process::exit(6);
+                }
+            }
+        }
     }
 }
+
