@@ -3,6 +3,7 @@ members = [
     "crates/pfg-model",
     "crates/pfg-policy",
     "crates/pfg-format-image",
+    "crates/pfg-format-pdf",
     "crates/pfg-core",
     "crates/pfg-cli",
 ]
