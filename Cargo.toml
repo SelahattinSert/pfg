@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "crates/pfg-model",
+]
+resolver = "2"
