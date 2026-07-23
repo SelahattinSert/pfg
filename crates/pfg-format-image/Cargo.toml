@@ -1,0 +1,11 @@
+[package]
+name = "pfg-format-image"
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+
+[dependencies]
+pfg-model = { path = "../pfg-model" }
+pfg-policy = { path = "../pfg-policy" }
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"

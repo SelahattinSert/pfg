@@ -2,6 +2,7 @@
 members = [
     "crates/pfg-model",
     "crates/pfg-policy",
+    "crates/pfg-format-image",
 ]
 resolver = "2"
 
