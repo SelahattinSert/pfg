@@ -24,11 +24,15 @@ pub fn sanitize_pdf(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, Pdf
         }
     })?;
 
-    // 1. Remove /Info entry from trailer dictionary
-    doc.trailer.remove(b"Info");
-
-    // 2. Identify objects to remove
+    // 1. Identify objects to remove
     let mut objects_to_remove = HashSet::new();
+
+    if let Ok(Object::Reference(id)) = doc.trailer.get(b"Info") {
+        objects_to_remove.insert(*id);
+    }
+
+    // Remove /Info entry from trailer dictionary
+    doc.trailer.remove(b"Info");
 
     for (&obj_id, object) in &doc.objects {
         match object {
