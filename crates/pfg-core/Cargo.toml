@@ -9,4 +9,7 @@ pfg-model = { path = "../pfg-model" }
 pfg-policy = { path = "../pfg-policy" }
 pfg-format-image = { path = "../pfg-format-image" }
 sha2 = "0.10"
+serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
+uuid = { version = "1.4", features = ["v4"] }
+
