@@ -1,0 +1,12 @@
+[package]
+name = "pfg-core"
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+
+[dependencies]
+pfg-model = { path = "../pfg-model" }
+pfg-policy = { path = "../pfg-policy" }
+pfg-format-image = { path = "../pfg-format-image" }
+sha2 = "0.10"
+thiserror = "1.0"
