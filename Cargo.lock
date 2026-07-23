@@ -481,7 +481,9 @@ dependencies = [
 name = "pfg-core"
 version = "0.1.0"
 dependencies = [
+ "lopdf",
  "pfg-format-image",
+ "pfg-format-pdf",
  "pfg-model",
  "pfg-policy",
  "serde",

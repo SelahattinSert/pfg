@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::Path;
 use pfg_format_image::{detect_format, scan_jpeg_metadata, ImageFormat};
+use pfg_format_pdf::{detect_pdf_format, scan_pdf_metadata};
 use pfg_model::{FindingSummary, InputFileMetadata, ScanReport, Severity};
 use pfg_policy::PolicyEngine;
 use sha2::{Digest, Sha256};
@@ -37,14 +38,26 @@ pub fn scan_file(path: &Path, options: &ScanOptions) -> Result<ScanReport, CoreE
     hasher.update(&buffer);
     let hash_hex = format!("{:x}", hasher.finalize());
 
-    let format = detect_format(&buffer).ok_or(CoreError::UnsupportedFormat)?;
     let policy = PolicyEngine::balanced();
 
-    let mut findings = match format {
-        ImageFormat::Jpeg => {
-            scan_jpeg_metadata(&buffer, &policy).map_err(|e| CoreError::ParseError(e.to_string()))?
-        }
-        _ => return Err(CoreError::UnsupportedFormat),
+    let (mut findings, detected_format) = if detect_pdf_format(&buffer) {
+        let findings = scan_pdf_metadata(&buffer, &policy)
+            .map_err(|e| CoreError::ParseError(e.to_string()))?;
+        (findings, "pdf".to_string())
+    } else if let Some(format) = detect_format(&buffer) {
+        let findings = match format {
+            ImageFormat::Jpeg => scan_jpeg_metadata(&buffer, &policy)
+                .map_err(|e| CoreError::ParseError(e.to_string()))?,
+            _ => return Err(CoreError::UnsupportedFormat),
+        };
+        let fmt_str = match format {
+            ImageFormat::Jpeg => "jpeg",
+            ImageFormat::Png => "png",
+            ImageFormat::WebP => "webp",
+        };
+        (findings, fmt_str.to_string())
+    } else {
+        return Err(CoreError::UnsupportedFormat);
     };
 
     let mut summary = FindingSummary::default();
@@ -79,13 +92,10 @@ pub fn scan_file(path: &Path, options: &ScanOptions) -> Result<ScanReport, CoreE
             size: buffer.len() as u64,
             sha256: hash_hex,
         },
-        detected_format: match format {
-            ImageFormat::Jpeg => "jpeg".to_string(),
-            ImageFormat::Png => "png".to_string(),
-            ImageFormat::WebP => "webp".to_string(),
-        },
+        detected_format,
         support_level: "full".to_string(),
         findings,
         summary,
     })
 }
+

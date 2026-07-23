@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use pfg_format_image::{detect_format, sanitize_image};
+use pfg_format_pdf::{detect_pdf_format, sanitize_pdf};
 use pfg_policy::CleanProfile;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
@@ -23,11 +24,20 @@ pub fn clean_file(path: &Path, options: &CleanOptions) -> Result<VerificationRep
     }
 
     let buffer = fs::read(path)?;
-    let format = detect_format(&buffer).ok_or(CoreError::UnsupportedFormat)?;
+
+    let (sanitized_bytes, is_pdf) = if detect_pdf_format(&buffer) {
+        let bytes = sanitize_pdf(&buffer, options.profile)
+            .map_err(|e| CoreError::ParseError(e.to_string()))?;
+        (bytes, true)
+    } else if let Some(format) = detect_format(&buffer) {
+        let bytes = sanitize_image(&buffer, format, options.profile)
+            .map_err(|e| CoreError::ParseError(e.to_string()))?;
+        (bytes, false)
+    } else {
+        return Err(CoreError::UnsupportedFormat);
+    };
 
     let original_scan = scan_file(path, &ScanOptions { include_values: true })?;
-    let sanitized_bytes = sanitize_image(&buffer, format, options.profile)
-        .map_err(|e| CoreError::ParseError(e.to_string()))?;
 
     let file_stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("file");
     let ext_str = path.extension().and_then(|e| e.to_str());
@@ -38,12 +48,24 @@ pub fn clean_file(path: &Path, options: &CleanOptions) -> Result<VerificationRep
         let hash_str = &format!("{:x}", hasher.finalize())[..12];
         match ext_str {
             Some(ext) => format!("{}.{}", hash_str, ext),
-            None => hash_str.to_string(),
+            None => {
+                if is_pdf {
+                    format!("{}.pdf", hash_str)
+                } else {
+                    hash_str.to_string()
+                }
+            }
         }
     } else {
         match ext_str {
             Some(ext) => format!("{}.pfg.{}", file_stem, ext),
-            None => format!("{}.pfg", file_stem),
+            None => {
+                if is_pdf {
+                    format!("{}.pfg.pdf", file_stem)
+                } else {
+                    format!("{}.pfg", file_stem)
+                }
+            }
         }
     };
 
@@ -96,3 +118,4 @@ pub fn clean_file(path: &Path, options: &CleanOptions) -> Result<VerificationRep
         assurance_level: "Container Rebuilt".to_string(),
     })
 }
+
