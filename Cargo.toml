@@ -1,5 +1,7 @@
 [workspace]
 members = [
     "crates/pfg-model",
+    "crates/pfg-policy",
 ]
 resolver = "2"
+
