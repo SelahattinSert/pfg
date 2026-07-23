@@ -232,6 +232,8 @@ name = "pfg-policy"
 version = "0.1.0"
 dependencies = [
  "pfg-model",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

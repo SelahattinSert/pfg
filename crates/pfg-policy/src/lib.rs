@@ -1,6 +1,10 @@
 #![forbid(unsafe_code)]
 
+pub mod profile;
 pub mod rules;
+
+pub use profile::CleanProfile;
+
 
 use pfg_model::{FindingCategory, Severity};
 
