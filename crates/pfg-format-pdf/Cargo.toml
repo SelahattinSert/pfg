@@ -5,3 +5,8 @@ edition = "2021"
 license = "MPL-2.0"
 
 [dependencies]
+lopdf = "0.31"
+pfg-model = { path = "../pfg-model" }
+pfg-policy = { path = "../pfg-policy" }
+thiserror = "1.0"
+
