@@ -5,7 +5,9 @@ edition = "2021"
 license = "MPL-2.0"
 
 [dependencies]
+crc32fast = "1.3"
 pfg-model = { path = "../pfg-model" }
 pfg-policy = { path = "../pfg-policy" }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
+
