@@ -317,4 +317,87 @@ fn test_cli_pdf_verify() {
     let _ = fs::remove_dir_all(&temp_dir);
 }
 
+#[test]
+fn test_cli_office_scan() {
+    let output = Command::new(env!("CARGO_BIN_EXE_pfg"))
+        .current_dir(get_workspace_root())
+        .args(&["scan", "fixtures/office/sample.docx", "--format", "json"])
+        .output()
+        .expect("Failed to execute pfg binary");
+
+    assert!(output.status.success(), "pfg scan fixtures/office/sample.docx should succeed");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("Stdout should be valid JSON");
+    assert_eq!(parsed["detected_format"], "docx");
+    assert!(
+        parsed["findings"].as_array().map_or(0, |f| f.len()) > 0,
+        "Scan output should contain findings"
+    );
+}
+
+#[test]
+fn test_cli_office_clean() {
+    let temp_dir = std::env::temp_dir().join("pfg_cli_test_office_clean");
+    let _ = fs::remove_dir_all(&temp_dir);
+    fs::create_dir_all(&temp_dir).unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_pfg"))
+        .current_dir(get_workspace_root())
+        .args(&[
+            "clean",
+            "fixtures/office/sample.docx",
+            "-o",
+            temp_dir.to_str().unwrap(),
+        ])
+        .output()
+        .expect("Failed to execute pfg binary");
+
+    assert_eq!(output.status.code(), Some(0), "pfg clean should exit with code 0");
+
+    let cleaned_file = temp_dir.join("sample.pfg.docx");
+    assert!(cleaned_file.exists(), "Cleaned output DOCX file should be created");
+
+    let _ = fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_cli_office_verify() {
+    let temp_dir = std::env::temp_dir().join("pfg_cli_test_office_verify");
+    let _ = fs::remove_dir_all(&temp_dir);
+    fs::create_dir_all(&temp_dir).unwrap();
+
+    let clean_output = Command::new(env!("CARGO_BIN_EXE_pfg"))
+        .current_dir(get_workspace_root())
+        .args(&[
+            "clean",
+            "fixtures/office/sample.docx",
+            "-o",
+            temp_dir.to_str().unwrap(),
+        ])
+        .output()
+        .expect("Failed to execute pfg clean");
+    assert!(clean_output.status.success());
+
+    let cleaned_file = temp_dir.join("sample.pfg.docx");
+
+    let verify_output = Command::new(env!("CARGO_BIN_EXE_pfg"))
+        .current_dir(get_workspace_root())
+        .args(&[
+            "verify",
+            "fixtures/office/sample.docx",
+            cleaned_file.to_str().unwrap(),
+        ])
+        .output()
+        .expect("Failed to execute pfg verify");
+
+    assert_eq!(
+        verify_output.status.code(),
+        Some(0),
+        "pfg verify on original vs cleaned DOCX should exit with code 0"
+    );
+
+    let _ = fs::remove_dir_all(&temp_dir);
+}
+
+
 
