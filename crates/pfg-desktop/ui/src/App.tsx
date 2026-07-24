@@ -37,6 +37,7 @@ export const App: React.FC = () => {
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [selectedFileSize, setSelectedFileSize] = useState<number | null>(null);
+  const [selectedFileObj, setSelectedFileObj] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isCleaningBatch, setIsCleaningBatch] = useState<boolean>(false);
   const [report, setReport] = useState<ScanReport | null>(null);
@@ -473,6 +474,7 @@ export const App: React.FC = () => {
   const handleScanFile = useCallback(
     async (filePath: string, fileObj?: File, includeValues: boolean = showRawValues) => {
       setSelectedFilePath(filePath);
+      setSelectedFileObj(fileObj || null);
       const name = fileObj ? fileObj.name : filePath.split('/').pop() || filePath;
       setSelectedFileName(name);
       if (fileObj) {
@@ -615,6 +617,7 @@ export const App: React.FC = () => {
     setSelectedFilePath(null);
     setSelectedFileName(null);
     setSelectedFileSize(null);
+    setSelectedFileObj(null);
     setReport(null);
     setVerificationReport(null);
     setError(null);
@@ -814,6 +817,7 @@ export const App: React.FC = () => {
                 <section className="space-y-6">
                   <CleanPanel
                     selectedFilePath={selectedFilePath || report.input.name}
+                    fileObj={selectedFileObj}
                     report={report}
                     onCleanSuccess={(verReport) => setVerificationReport(verReport)}
                   />
