@@ -7,6 +7,7 @@ members = [
     "crates/pfg-format-office",
     "crates/pfg-core",
     "crates/pfg-cli",
+    "crates/pfg-desktop",
 ]
 resolver = "2"
 
