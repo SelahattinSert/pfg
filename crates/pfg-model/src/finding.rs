@@ -12,6 +12,7 @@ pub enum FindingSource {
     PdfInfo,
     PdfObject,
     FileSystem,
+    OfficeXml,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
