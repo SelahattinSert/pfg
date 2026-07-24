@@ -1,11 +1,28 @@
 import React, { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { ScanReport, Finding, VerificationReport } from './types/pfg';
+import {
+  ScanReport,
+  Finding,
+  VerificationReport,
+  BatchScanReport,
+  BatchCleanReport,
+  CleanProfile,
+} from './types/pfg';
 import DropZone from './components/DropZone';
 import FindingsList from './components/FindingsList';
 import CleanPanel from './components/CleanPanel';
 import VerificationBadge from './components/VerificationBadge';
-import { Shield, FileText, Hash, HardDrive, RefreshCw, Sparkles, CheckCircle2 } from 'lucide-react';
+import BatchDashboard from './components/BatchDashboard';
+import {
+  Shield,
+  FileText,
+  Hash,
+  HardDrive,
+  RefreshCw,
+  Sparkles,
+  CheckCircle2,
+  FolderSearch,
+} from 'lucide-react';
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 Bytes';
@@ -16,11 +33,15 @@ function formatBytes(bytes: number): string {
 }
 
 export const App: React.FC = () => {
+  const [mode, setMode] = useState<'single' | 'batch'>('single');
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [selectedFileSize, setSelectedFileSize] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isCleaningBatch, setIsCleaningBatch] = useState<boolean>(false);
   const [report, setReport] = useState<ScanReport | null>(null);
+  const [batchScanReport, setBatchScanReport] = useState<BatchScanReport | null>(null);
+  const [batchCleanReport, setBatchCleanReport] = useState<BatchCleanReport | null>(null);
   const [verificationReport, setVerificationReport] = useState<VerificationReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showRawValues, setShowRawValues] = useState<boolean>(false);
@@ -113,6 +134,54 @@ export const App: React.FC = () => {
     };
   };
 
+  // Mock batch scan report fallback for browser preview mode
+  const createMockBatchReport = (targetPath: string): BatchScanReport => {
+    const mockReports = [
+      createMockReport(`${targetPath}/family_vacation_2026.jpg`, 'family_vacation_2026.jpg', 3200000),
+      createMockReport(`${targetPath}/project_proposal.pdf`, 'project_proposal.pdf', 1500000),
+      createMockReport(`${targetPath}/financial_q2.xlsx`, 'financial_q2.xlsx', 890000),
+      createMockReport(`${targetPath}/clean_document.pdf`, 'clean_document.pdf', 450000),
+    ];
+    // Set 4th report to clean
+    mockReports[3].findings = [];
+    mockReports[3].summary = { critical: 0, high: 0, medium: 0, low: 0, informational: 0 };
+
+    return {
+      target_path: targetPath,
+      files_scanned: 4,
+      files_skipped: 0,
+      total_findings: 15,
+      reports: mockReports,
+      summary: {
+        critical: 3,
+        high: 3,
+        medium: 3,
+        low: 3,
+        informational: 3,
+      },
+    };
+  };
+
+  // Mock batch clean report fallback
+  const createMockBatchCleanReport = (batchReport: BatchScanReport): BatchCleanReport => {
+    return {
+      target_path: batchReport.target_path,
+      total_files: batchReport.files_scanned,
+      cleaned_files: batchReport.files_scanned,
+      skipped_files: 0,
+      failed_files: 0,
+      verified_clean_count: batchReport.files_scanned,
+      file_reports: batchReport.reports.map((r) => ({
+        original_sha256: r.input.sha256,
+        cleaned_sha256: 'a1b2c3d4e5f678901234567890abcdef1234567890abcdef1234567890abcdef',
+        original_findings_count: r.findings.length,
+        cleaned_findings_count: 0,
+        verified_clean: true,
+        assurance_level: 'HighAssurance',
+      })),
+    };
+  };
+
   const handleScanFile = useCallback(
     async (filePath: string, fileObj?: File, includeValues: boolean = showRawValues) => {
       setSelectedFilePath(filePath);
@@ -129,11 +198,10 @@ export const App: React.FC = () => {
       setVerificationReport(null); // Reset post-cleaning verification on new scan
 
       try {
-        // Attempt Tauri IPC invoke
         const res = await invoke<ScanReport>('scan_file_cmd', {
           path: filePath,
           includeValues: includeValues,
-          include_values: includeValues, // handle both camelCase and snake_case
+          include_values: includeValues,
         });
         setReport(res);
         if (res.input.size) {
@@ -141,7 +209,6 @@ export const App: React.FC = () => {
         }
       } catch (err) {
         console.warn('Tauri IPC scan_file_cmd failed or running in non-Tauri browser mode:', err);
-        // If IPC failed because we're in browser dev mode (not Tauri environment), use realistic mock report
         const isTauriErr = String(err).includes('ipc') || String(err).includes('window.__TAURI');
         if (isTauriErr || typeof window === 'undefined' || !(window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__) {
           console.info('Using fallback mock scan report for preview mode.');
@@ -157,6 +224,88 @@ export const App: React.FC = () => {
     },
     [showRawValues]
   );
+
+  const handleScanDirectory = useCallback(
+    async (path: string, recursive: boolean, jobs: number | null, ignorePatterns: string[]) => {
+      setIsLoading(true);
+      setError(null);
+      setBatchCleanReport(null);
+
+      try {
+        const res = await invoke<BatchScanReport>('scan_directory_cmd', {
+          path,
+          recursive,
+          jobs,
+          ignorePatterns,
+          ignore_patterns: ignorePatterns,
+        });
+        setBatchScanReport(res);
+      } catch (err) {
+        console.warn('Tauri IPC scan_directory_cmd failed or running in non-Tauri mode:', err);
+        const isTauriErr = String(err).includes('ipc') || String(err).includes('window.__TAURI');
+        if (isTauriErr || typeof window === 'undefined' || !(window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__) {
+          console.info('Using fallback mock batch scan report for preview mode.');
+          const mockBatch = createMockBatchReport(path);
+          setBatchScanReport(mockBatch);
+        } else {
+          setError(typeof err === 'string' ? err : String(err));
+          setBatchScanReport(null);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
+
+  const handleCleanDirectory = useCallback(
+    async (
+      path: string,
+      recursive: boolean,
+      jobs: number | null,
+      profile: CleanProfile,
+      inPlace: boolean
+    ) => {
+      setIsCleaningBatch(true);
+      setError(null);
+
+      try {
+        const res = await invoke<BatchCleanReport>('clean_directory_cmd', {
+          path,
+          recursive,
+          jobs,
+          profile,
+          inPlace,
+          in_place: inPlace,
+        });
+        setBatchCleanReport(res);
+      } catch (err) {
+        console.warn('Tauri IPC clean_directory_cmd failed or running in non-Tauri mode:', err);
+        const isTauriErr = String(err).includes('ipc') || String(err).includes('window.__TAURI');
+        if (isTauriErr || typeof window === 'undefined' || !(window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__) {
+          console.info('Using fallback mock batch clean report for preview mode.');
+          if (batchScanReport) {
+            const mockClean = createMockBatchCleanReport(batchScanReport);
+            setBatchCleanReport(mockClean);
+          }
+        } else {
+          setError(typeof err === 'string' ? err : String(err));
+        }
+      } finally {
+        setIsCleaningBatch(false);
+      }
+    },
+    [batchScanReport]
+  );
+
+  const handleInspectFileFromBatch = useCallback((fileReport: ScanReport) => {
+    setSelectedFilePath(fileReport.input.name);
+    setSelectedFileName(fileReport.input.name);
+    setSelectedFileSize(fileReport.input.size);
+    setReport(fileReport);
+    setVerificationReport(null);
+    setMode('single');
+  }, []);
 
   const handleToggleRawValues = useCallback(
     (newShow: boolean) => {
@@ -177,6 +326,12 @@ export const App: React.FC = () => {
     setError(null);
   }, []);
 
+  const handleResetBatch = useCallback(() => {
+    setBatchScanReport(null);
+    setBatchCleanReport(null);
+    setError(null);
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 font-sans selection:bg-indigo-500 selection:text-white">
       {/* Background Lighting Effects */}
@@ -186,7 +341,7 @@ export const App: React.FC = () => {
       {/* Main Container */}
       <div className="max-w-6xl mx-auto px-4 py-8 space-y-8 relative z-10">
         {/* App Navbar Header */}
-        <header className="flex items-center justify-between border-b border-slate-800/80 pb-6">
+        <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-6">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 shadow-lg shadow-indigo-500/20 text-white">
               <Shield className="w-7 h-7" />
@@ -206,131 +361,179 @@ export const App: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+            {/* Header Mode Switcher Toggle */}
+            <div className="inline-flex p-1 bg-slate-900/90 rounded-xl border border-slate-800">
+              <button
+                type="button"
+                onClick={() => setMode('single')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                  mode === 'single'
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                Single File
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('batch')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                  mode === 'batch'
+                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-purple-600/30'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <FolderSearch className="w-3.5 h-3.5" />
+                Batch Mode
+              </button>
+            </div>
+
+            <span className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               <CheckCircle2 className="w-3.5 h-3.5" />
               Air-Gapped Offline Protection
             </span>
           </div>
         </header>
 
-        {/* Section 1: DropZone Component */}
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-indigo-400" />
-              Target File Selection
-            </h2>
-            {report && (
-              <button
-                type="button"
-                onClick={handleClear}
-                className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                Scan New File
-              </button>
-            )}
-          </div>
-
-          <DropZone
-            onFileSelect={(path, fileObj) => handleScanFile(path, fileObj)}
+        {/* View Switcher based on Mode state */}
+        {mode === 'batch' ? (
+          <BatchDashboard
+            mode={mode}
+            onModeToggle={(m) => setMode(m)}
+            onScanDirectory={handleScanDirectory}
+            onCleanDirectory={handleCleanDirectory}
             isLoading={isLoading}
-            selectedFilePath={selectedFilePath}
-            selectedFileName={selectedFileName}
-            selectedFileSize={selectedFileSize}
+            isCleaning={isCleaningBatch}
+            batchScanReport={batchScanReport}
+            batchCleanReport={batchCleanReport}
+            onInspectFile={handleInspectFileFromBatch}
             error={error}
-            onClear={handleClear}
+            onResetBatch={handleResetBatch}
           />
-        </section>
-
-        {/* Section 2: Scan Report File Summary Header */}
-        {report && (
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-3 duration-300">
-            <section className="glass-card p-6 space-y-4">
-              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-indigo-400">
-                    <FileText className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <span>{report.input.name}</span>
-                      <span className="px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase">
-                        {report.detected_format}
-                      </span>
-                    </h3>
-                    <div className="flex items-center gap-4 text-xs text-slate-400 font-mono mt-0.5">
-                      <span className="flex items-center gap-1">
-                        <HardDrive className="w-3.5 h-3.5" />
-                        {formatBytes(report.input.size)}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Hash className="w-3.5 h-3.5" />
-                        <span className="truncate max-w-[200px]" title={report.input.sha256}>
-                          {report.input.sha256.substring(0, 16)}...
-                        </span>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Severity Breakdown Summary Badges */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  {report.summary.critical > 0 && (
-                    <span className="badge-severity badge-critical">
-                      {report.summary.critical} Critical
-                    </span>
-                  )}
-                  {report.summary.high > 0 && (
-                    <span className="badge-severity badge-high">
-                      {report.summary.high} High
-                    </span>
-                  )}
-                  {report.summary.medium > 0 && (
-                    <span className="badge-severity badge-medium">
-                      {report.summary.medium} Medium
-                    </span>
-                  )}
-                  {report.summary.low > 0 && (
-                    <span className="badge-severity badge-low">
-                      {report.summary.low} Low
-                    </span>
-                  )}
-                  {report.summary.informational > 0 && (
-                    <span className="badge-severity badge-informational">
-                      {report.summary.informational} Info
-                    </span>
-                  )}
-                </div>
+        ) : (
+          /* Single File Mode Layout */
+          <div className="space-y-8 animate-in fade-in duration-300">
+            {/* Section 1: DropZone Component */}
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-indigo-400" />
+                  Target File Selection
+                </h2>
+                {report && (
+                  <button
+                    type="button"
+                    onClick={handleClear}
+                    className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Scan New File
+                  </button>
+                )}
               </div>
 
-              {/* Section 3: FindingsList Component */}
-              <FindingsList
-                findings={report.findings}
-                summary={report.summary}
-                showRawValues={showRawValues}
-                onToggleRawValues={handleToggleRawValues}
-                detectedFormat={report.detected_format}
+              <DropZone
+                onFileSelect={(path, fileObj) => handleScanFile(path, fileObj)}
+                isLoading={isLoading}
+                selectedFilePath={selectedFilePath}
+                selectedFileName={selectedFileName}
+                selectedFileSize={selectedFileSize}
+                error={error}
+                onClear={handleClear}
               />
             </section>
 
-            {/* Section 4: CleanPanel Component */}
-            <section className="space-y-6">
-              <CleanPanel
-                selectedFilePath={selectedFilePath || report.input.name}
-                report={report}
-                onCleanSuccess={(verReport) => setVerificationReport(verReport)}
-              />
+            {/* Section 2: Scan Report File Summary Header */}
+            {report && (
+              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-3 duration-300">
+                <section className="glass-card p-6 space-y-4">
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-indigo-400">
+                        <FileText className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                          <span>{report.input.name}</span>
+                          <span className="px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase">
+                            {report.detected_format}
+                          </span>
+                        </h3>
+                        <div className="flex items-center gap-4 text-xs text-slate-400 font-mono mt-0.5">
+                          <span className="flex items-center gap-1">
+                            <HardDrive className="w-3.5 h-3.5" />
+                            {formatBytes(report.input.size)}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Hash className="w-3.5 h-3.5" />
+                            <span className="truncate max-w-[200px]" title={report.input.sha256}>
+                              {report.input.sha256.substring(0, 16)}...
+                            </span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
 
-              {/* Section 5: VerificationBadge Component */}
-              {verificationReport && (
-                <VerificationBadge
-                  report={verificationReport}
-                  originalFileName={report.input.name}
-                />
-              )}
-            </section>
+                    {/* Severity Breakdown Summary Badges */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {report.summary.critical > 0 && (
+                        <span className="badge-severity badge-critical">
+                          {report.summary.critical} Critical
+                        </span>
+                      )}
+                      {report.summary.high > 0 && (
+                        <span className="badge-severity badge-high">
+                          {report.summary.high} High
+                        </span>
+                      )}
+                      {report.summary.medium > 0 && (
+                        <span className="badge-severity badge-medium">
+                          {report.summary.medium} Medium
+                        </span>
+                      )}
+                      {report.summary.low > 0 && (
+                        <span className="badge-severity badge-low">
+                          {report.summary.low} Low
+                        </span>
+                      )}
+                      {report.summary.informational > 0 && (
+                        <span className="badge-severity badge-informational">
+                          {report.summary.informational} Info
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Section 3: FindingsList Component */}
+                  <FindingsList
+                    findings={report.findings}
+                    summary={report.summary}
+                    showRawValues={showRawValues}
+                    onToggleRawValues={handleToggleRawValues}
+                    detectedFormat={report.detected_format}
+                  />
+                </section>
+
+                {/* Section 4: CleanPanel Component */}
+                <section className="space-y-6">
+                  <CleanPanel
+                    selectedFilePath={selectedFilePath || report.input.name}
+                    report={report}
+                    onCleanSuccess={(verReport) => setVerificationReport(verReport)}
+                  />
+
+                  {/* Section 5: VerificationBadge Component */}
+                  {verificationReport && (
+                    <VerificationBadge
+                      report={verificationReport}
+                      originalFileName={report.input.name}
+                    />
+                  )}
+                </section>
+              </div>
+            )}
           </div>
         )}
       </div>
