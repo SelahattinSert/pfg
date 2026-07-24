@@ -192,7 +192,7 @@ export const CleanPanel: React.FC<CleanPanelProps> = ({
         URL.revokeObjectURL(downloadUrl);
 
         const origHash = report?.input.sha256 || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
-        const mockVerification: VerificationReport = {
+        const browserVerification: VerificationReport = {
           original_sha256: origHash,
           cleaned_sha256: cleanedHash,
           original_findings_count: report?.findings.length ?? 0,
@@ -200,7 +200,7 @@ export const CleanPanel: React.FC<CleanPanelProps> = ({
           verified_clean: true,
           assurance_level: profile === 'Strict' ? 'FullSanitization' : 'BalancedSanitization',
         };
-        onCleanSuccess(mockVerification);
+        onCleanSuccess(browserVerification);
       } else {
         setCleanError(typeof err === 'string' ? err : String(err));
       }

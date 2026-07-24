@@ -47,181 +47,7 @@ export const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showRawValues, setShowRawValues] = useState<boolean>(false);
 
-  // Fallback mock scan report for browser dev mode
-  // Dynamic scan report generator for browser preview mode
-  const createMockReport = (_path: string, fileName: string, size?: number): ScanReport => {
-    const ext = fileName.split('.').pop()?.toLowerCase() || 'jpeg';
-    const lowerName = fileName.toLowerCase();
-    
-    // Simple deterministic hash for file
-    let hash = 0;
-    for (let i = 0; i < fileName.length; i++) {
-      hash = (hash << 5) - hash + fileName.charCodeAt(i);
-      hash |= 0;
-    }
-    const hexHash = Math.abs(hash).toString(16).padStart(64, 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
 
-    // Clean files (e.g. web exports, logos, banners, chatgpt images)
-    const isCleanFile = lowerName.includes('clean') || 
-                        lowerName.includes('logo') || 
-                        lowerName.includes('banner') || 
-                        lowerName.includes('chatgpt') || 
-                        lowerName.includes('favicon') || 
-                        lowerName.includes('export');
-
-    const mockFindings: Finding[] = [];
-
-    if (!isCleanFile) {
-      if (ext === 'pdf') {
-        mockFindings.push({
-          id: `finding-pdf-1-${Math.abs(hash % 100)}`,
-          category: 'identity',
-          severity: 'high',
-          source: 'pdf_info',
-          key: '/Author',
-          display_value: 'Document Author (user@company.com)',
-          raw_value_available: true,
-          location: { pdf_object: { object_number: 12 } },
-          risk_explanation: 'PDF /Info dictionary reveals author full name and email identity.',
-          removable: true,
-        });
-        mockFindings.push({
-          id: `finding-pdf-2-${Math.abs(hash % 100)}`,
-          category: 'document-history',
-          severity: 'medium',
-          source: 'pdf_info',
-          key: '/Creator',
-          display_value: 'Microsoft Word for Office 365',
-          raw_value_available: true,
-          location: { pdf_object: { object_number: 12 } },
-          risk_explanation: 'Discloses software application used to convert/export the PDF document.',
-          removable: true,
-        });
-      } else if (ext === 'docx' || ext === 'xlsx' || ext === 'pptx') {
-        mockFindings.push({
-          id: `finding-office-1-${Math.abs(hash % 100)}`,
-          category: 'identity',
-          severity: 'high',
-          source: 'office_xml',
-          key: 'dc:creator',
-          display_value: 'Corporate User',
-          raw_value_available: true,
-          location: { header: { segment: 'docProps/core.xml' } },
-          risk_explanation: 'Office Open XML core properties contain original document author name.',
-          removable: true,
-        });
-        mockFindings.push({
-          id: `finding-office-2-${Math.abs(hash % 100)}`,
-          category: 'software',
-          severity: 'medium',
-          source: 'office_xml',
-          key: 'cp:lastModifiedBy',
-          display_value: 'Editor User (IT Dept)',
-          raw_value_available: true,
-          location: { header: { segment: 'docProps/core.xml' } },
-          risk_explanation: 'Exposes account name of the last person who saved or modified this document.',
-          removable: true,
-        });
-      } else {
-        // Image formats (jpeg, png, webp)
-        mockFindings.push({
-          id: `finding-img-1-${Math.abs(hash % 100)}`,
-          category: 'location',
-          severity: 'high',
-          source: 'exif',
-          key: 'GPSLatitude',
-          display_value: `37° ${(Math.abs(hash) % 50)}' ${(Math.abs(hash) % 60)}.2" N`,
-          raw_value_available: true,
-          location: { header: { segment: 'EXIF_IFD0' } },
-          risk_explanation: 'Contains precise physical GPS location metadata that exposes user geographical coordinates.',
-          removable: true,
-        });
-        mockFindings.push({
-          id: `finding-img-2-${Math.abs(hash % 100)}`,
-          category: 'device',
-          severity: 'medium',
-          source: 'exif',
-          key: 'MakeAndModel',
-          display_value: ext === 'png' ? 'PNG eXIf Camera Metadata' : 'Camera Hardware EXIF Tag',
-          raw_value_available: true,
-          location: { header: { segment: 'EXIF_IFD0' } },
-          risk_explanation: 'Reveals camera hardware model and device serial information.',
-          removable: true,
-        });
-      }
-    }
-
-    const summary = {
-      critical: mockFindings.filter((f) => f.severity === 'critical').length,
-      high: mockFindings.filter((f) => f.severity === 'high').length,
-      medium: mockFindings.filter((f) => f.severity === 'medium').length,
-      low: mockFindings.filter((f) => f.severity === 'low').length,
-      informational: mockFindings.filter((f) => f.severity === 'informational').length,
-    };
-
-    return {
-      schema_version: 1,
-      tool_version: '0.1.0',
-      operation: 'scan_file',
-      input: {
-        name: fileName,
-        size: size || Math.abs(hash % 5000000) + 50000,
-        sha256: hexHash,
-      },
-      detected_format: ext,
-      support_level: 'FullSupport',
-      findings: mockFindings,
-      summary,
-    };
-  };
-
-  // Mock batch scan report fallback for browser preview mode
-  const createMockBatchReport = (targetPath: string): BatchScanReport => {
-    const mockReports = [
-      createMockReport(`${targetPath}/family_vacation_2026.jpg`, 'family_vacation_2026.jpg', 3200000),
-      createMockReport(`${targetPath}/project_proposal.pdf`, 'project_proposal.pdf', 1500000),
-      createMockReport(`${targetPath}/financial_q2.xlsx`, 'financial_q2.xlsx', 890000),
-      createMockReport(`${targetPath}/clean_document.pdf`, 'clean_document.pdf', 450000),
-    ];
-    // Set 4th report to clean
-    mockReports[3].findings = [];
-    mockReports[3].summary = { critical: 0, high: 0, medium: 0, low: 0, informational: 0 };
-
-    return {
-      target_path: targetPath,
-      files_scanned: 4,
-      files_skipped: 0,
-      total_findings: 15,
-      reports: mockReports,
-      summary: {
-        critical: 3,
-        high: 3,
-        medium: 3,
-        low: 3,
-        informational: 3,
-      },
-    };
-  };
-
-  // Mock batch clean report fallback
-  const createMockBatchCleanReport = (batchReport: BatchScanReport): BatchCleanReport => {
-    return {
-      target_path: batchReport.target_path,
-      total_files: batchReport.files_scanned,
-      cleaned_files: batchReport.files_scanned,
-      skipped_files: 0,
-      failed_files: 0,
-      verified_clean_count: batchReport.files_scanned,
-      file_reports: batchReport.reports.map((r) => ({
-        original_sha256: r.input.sha256,
-        cleaned_sha256: 'a1b2c3d4e5f678901234567890abcdef1234567890abcdef1234567890abcdef',
-        original_findings_count: r.findings.length,
-        cleaned_findings_count: 0,
-        verified_clean: true,
-        assurance_level: 'HighAssurance',
-      })),
-    };
-  };
 
   // Real binary byte parser for browser preview mode fallback
   const parseRealFileInBrowser = async (fileObj: File): Promise<ScanReport> => {
@@ -502,13 +328,12 @@ export const App: React.FC = () => {
         const isTauriErr = String(err).includes('ipc') || String(err).includes('window.__TAURI');
         if (isTauriErr || typeof window === 'undefined' || !(window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__) {
           if (fileObj) {
-            console.info('Parsing REAL binary bytes of dropped file in browser preview mode!');
+            console.info('Parsing real binary bytes of dropped file in browser mode.');
             const realReport = await parseRealFileInBrowser(fileObj);
             setReport(realReport);
           } else {
-            console.info('Using fallback mock scan report for preview mode.');
-            const mock = createMockReport(filePath, name, undefined);
-            setReport(mock);
+            setError('Tauri IPC is not available. Please drop a file to scan in browser mode, or run the native Tauri desktop app.');
+            setReport(null);
           }
         } else {
           setError(typeof err === 'string' ? err : String(err));
@@ -540,9 +365,8 @@ export const App: React.FC = () => {
         console.warn('Tauri IPC scan_directory_cmd failed or running in non-Tauri mode:', err);
         const isTauriErr = String(err).includes('ipc') || String(err).includes('window.__TAURI');
         if (isTauriErr || typeof window === 'undefined' || !(window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__) {
-          console.info('Using fallback mock batch scan report for preview mode.');
-          const mockBatch = createMockBatchReport(path);
-          setBatchScanReport(mockBatch);
+          setError('Batch directory scanning requires the native Tauri desktop app. Browser mode only supports single file scanning via drag & drop.');
+          setBatchScanReport(null);
         } else {
           setError(typeof err === 'string' ? err : String(err));
           setBatchScanReport(null);
@@ -579,11 +403,7 @@ export const App: React.FC = () => {
         console.warn('Tauri IPC clean_directory_cmd failed or running in non-Tauri mode:', err);
         const isTauriErr = String(err).includes('ipc') || String(err).includes('window.__TAURI');
         if (isTauriErr || typeof window === 'undefined' || !(window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__) {
-          console.info('Using fallback mock batch clean report for preview mode.');
-          if (batchScanReport) {
-            const mockClean = createMockBatchCleanReport(batchScanReport);
-            setBatchCleanReport(mockClean);
-          }
+          setError('Batch directory cleaning requires the native Tauri desktop app. Browser mode only supports single file cleaning via drag & drop.');
         } else {
           setError(typeof err === 'string' ? err : String(err));
         }
