@@ -1,0 +1,11 @@
+[package]
+name = "pfg-format-office"
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+
+[dependencies]
+zip = { version = "0.6", default-features = false }
+thiserror = "1.0"
+pfg-model = { path = "../pfg-model" }
+pfg-policy = { path = "../pfg-policy" }
