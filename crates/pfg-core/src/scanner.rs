@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::Path;
-use pfg_format_image::{detect_format, scan_jpeg_metadata, ImageFormat};
+use pfg_format_image::{detect_format, scan_jpeg_metadata, scan_png_metadata, scan_webp_metadata, ImageFormat};
 use pfg_format_office::{detect_office_format, scan_office_metadata, OfficeFormat};
 use pfg_format_pdf::{detect_pdf_format, scan_pdf_metadata};
 use pfg_model::{FindingSummary, InputFileMetadata, ScanReport, Severity};
@@ -58,7 +58,10 @@ pub fn scan_file(path: &Path, options: &ScanOptions) -> Result<ScanReport, CoreE
         let findings = match format {
             ImageFormat::Jpeg => scan_jpeg_metadata(&buffer, &policy)
                 .map_err(|e| CoreError::ParseError(e.to_string()))?,
-            _ => return Err(CoreError::UnsupportedFormat),
+            ImageFormat::Png => scan_png_metadata(&buffer, &policy)
+                .map_err(|e| CoreError::ParseError(e.to_string()))?,
+            ImageFormat::WebP => scan_webp_metadata(&buffer, &policy)
+                .map_err(|e| CoreError::ParseError(e.to_string()))?,
         };
         let fmt_str = match format {
             ImageFormat::Jpeg => "jpeg",
