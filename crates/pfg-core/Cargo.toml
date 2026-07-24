@@ -14,8 +14,9 @@ sha2 = "0.10"
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
 uuid = { version = "1.4", features = ["v4"] }
+rayon = "1.8"
+walkdir = "2.4"
 
 [dev-dependencies]
 lopdf = "0.31"
 zip = { version = "0.6", default-features = false }
-
