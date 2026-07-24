@@ -427,10 +427,10 @@ export const App: React.FC = () => {
     (newShow: boolean) => {
       setShowRawValues(newShow);
       if (selectedFilePath) {
-        handleScanFile(selectedFilePath, undefined, newShow);
+        handleScanFile(selectedFilePath, selectedFileObj || undefined, newShow);
       }
     },
-    [selectedFilePath, handleScanFile]
+    [selectedFilePath, selectedFileObj, handleScanFile]
   );
 
   const handleClear = useCallback(() => {
