@@ -1,8 +1,10 @@
 import React, { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { ScanReport, Finding } from './types/pfg';
+import { ScanReport, Finding, VerificationReport } from './types/pfg';
 import DropZone from './components/DropZone';
 import FindingsList from './components/FindingsList';
+import CleanPanel from './components/CleanPanel';
+import VerificationBadge from './components/VerificationBadge';
 import { Shield, FileText, Hash, HardDrive, RefreshCw, Sparkles, CheckCircle2 } from 'lucide-react';
 
 function formatBytes(bytes: number): string {
@@ -19,6 +21,7 @@ export const App: React.FC = () => {
   const [selectedFileSize, setSelectedFileSize] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [report, setReport] = useState<ScanReport | null>(null);
+  const [verificationReport, setVerificationReport] = useState<VerificationReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showRawValues, setShowRawValues] = useState<boolean>(false);
 
@@ -123,6 +126,7 @@ export const App: React.FC = () => {
 
       setIsLoading(true);
       setError(null);
+      setVerificationReport(null); // Reset post-cleaning verification on new scan
 
       try {
         // Attempt Tauri IPC invoke
@@ -169,6 +173,7 @@ export const App: React.FC = () => {
     setSelectedFileName(null);
     setSelectedFileSize(null);
     setReport(null);
+    setVerificationReport(null);
     setError(null);
   }, []);
 
@@ -241,73 +246,92 @@ export const App: React.FC = () => {
 
         {/* Section 2: Scan Report File Summary Header */}
         {report && (
-          <section className="glass-card p-6 space-y-4 animate-in fade-in slide-in-from-bottom-3 duration-300">
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-indigo-400">
-                  <FileText className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                    <span>{report.input.name}</span>
-                    <span className="px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase">
-                      {report.detected_format}
-                    </span>
-                  </h3>
-                  <div className="flex items-center gap-4 text-xs text-slate-400 font-mono mt-0.5">
-                    <span className="flex items-center gap-1">
-                      <HardDrive className="w-3.5 h-3.5" />
-                      {formatBytes(report.input.size)}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Hash className="w-3.5 h-3.5" />
-                      <span className="truncate max-w-[200px]" title={report.input.sha256}>
-                        {report.input.sha256.substring(0, 16)}...
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-3 duration-300">
+            <section className="glass-card p-6 space-y-4">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-indigo-400">
+                    <FileText className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      <span>{report.input.name}</span>
+                      <span className="px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase">
+                        {report.detected_format}
                       </span>
-                    </span>
+                    </h3>
+                    <div className="flex items-center gap-4 text-xs text-slate-400 font-mono mt-0.5">
+                      <span className="flex items-center gap-1">
+                        <HardDrive className="w-3.5 h-3.5" />
+                        {formatBytes(report.input.size)}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Hash className="w-3.5 h-3.5" />
+                        <span className="truncate max-w-[200px]" title={report.input.sha256}>
+                          {report.input.sha256.substring(0, 16)}...
+                        </span>
+                      </span>
+                    </div>
                   </div>
                 </div>
+
+                {/* Severity Breakdown Summary Badges */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {report.summary.critical > 0 && (
+                    <span className="badge-severity badge-critical">
+                      {report.summary.critical} Critical
+                    </span>
+                  )}
+                  {report.summary.high > 0 && (
+                    <span className="badge-severity badge-high">
+                      {report.summary.high} High
+                    </span>
+                  )}
+                  {report.summary.medium > 0 && (
+                    <span className="badge-severity badge-medium">
+                      {report.summary.medium} Medium
+                    </span>
+                  )}
+                  {report.summary.low > 0 && (
+                    <span className="badge-severity badge-low">
+                      {report.summary.low} Low
+                    </span>
+                  )}
+                  {report.summary.informational > 0 && (
+                    <span className="badge-severity badge-informational">
+                      {report.summary.informational} Info
+                    </span>
+                  )}
+                </div>
               </div>
 
-              {/* Severity Breakdown Summary Badges */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {report.summary.critical > 0 && (
-                  <span className="badge-severity badge-critical">
-                    {report.summary.critical} Critical
-                  </span>
-                )}
-                {report.summary.high > 0 && (
-                  <span className="badge-severity badge-high">
-                    {report.summary.high} High
-                  </span>
-                )}
-                {report.summary.medium > 0 && (
-                  <span className="badge-severity badge-medium">
-                    {report.summary.medium} Medium
-                  </span>
-                )}
-                {report.summary.low > 0 && (
-                  <span className="badge-severity badge-low">
-                    {report.summary.low} Low
-                  </span>
-                )}
-                {report.summary.informational > 0 && (
-                  <span className="badge-severity badge-informational">
-                    {report.summary.informational} Info
-                  </span>
-                )}
-              </div>
-            </div>
+              {/* Section 3: FindingsList Component */}
+              <FindingsList
+                findings={report.findings}
+                summary={report.summary}
+                showRawValues={showRawValues}
+                onToggleRawValues={handleToggleRawValues}
+                detectedFormat={report.detected_format}
+              />
+            </section>
 
-            {/* Section 3: FindingsList Component */}
-            <FindingsList
-              findings={report.findings}
-              summary={report.summary}
-              showRawValues={showRawValues}
-              onToggleRawValues={handleToggleRawValues}
-              detectedFormat={report.detected_format}
-            />
-          </section>
+            {/* Section 4: CleanPanel Component */}
+            <section className="space-y-6">
+              <CleanPanel
+                selectedFilePath={selectedFilePath || report.input.name}
+                report={report}
+                onCleanSuccess={(verReport) => setVerificationReport(verReport)}
+              />
+
+              {/* Section 5: VerificationBadge Component */}
+              {verificationReport && (
+                <VerificationBadge
+                  report={verificationReport}
+                  originalFileName={report.input.name}
+                />
+              )}
+            </section>
+          </div>
         )}
       </div>
     </div>
