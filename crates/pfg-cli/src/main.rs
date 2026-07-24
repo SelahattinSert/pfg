@@ -5,7 +5,10 @@ use std::path::PathBuf;
 use std::process;
 
 use clap::{Parser, Subcommand, ValueEnum};
-use pfg_core::{clean_file, scan_file, verify_files, CleanOptions, CleanProfile, ScanOptions};
+use pfg_core::{
+    clean_directory, clean_file, scan_directory, scan_file, verify_files, BatchCleanOptions,
+    BatchScanOptions, CleanOptions, CleanProfile, ScanOptions,
+};
 use pfg_model::Severity;
 
 #[derive(Parser)]
@@ -17,10 +20,22 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Scan a file for privacy-sensitive metadata
+    /// Scan a file or directory for privacy-sensitive metadata
     Scan {
-        /// Path to target file
+        /// Path to target file or directory
         path: PathBuf,
+
+        /// Process directory recursively
+        #[arg(short = 'r', long = "recursive")]
+        recursive: bool,
+
+        /// Number of parallel worker threads
+        #[arg(short = 'j', long = "jobs")]
+        jobs: Option<usize>,
+
+        /// Ignore patterns for file/directory names
+        #[arg(long = "ignore")]
+        ignore: Vec<String>,
 
         /// Output format (text or json)
         #[arg(short = 'f', long = "format", default_value = "text")]
@@ -39,10 +54,22 @@ enum Commands {
         include_values: bool,
     },
 
-    /// Clean privacy-sensitive metadata from a file
+    /// Clean privacy-sensitive metadata from a file or directory
     Clean {
-        /// Path to target file
+        /// Path to target file or directory
         path: PathBuf,
+
+        /// Process directory recursively
+        #[arg(short = 'r', long = "recursive")]
+        recursive: bool,
+
+        /// Number of parallel worker threads
+        #[arg(short = 'j', long = "jobs")]
+        jobs: Option<usize>,
+
+        /// Clean files in-place replacing original files
+        #[arg(long = "in-place")]
+        in_place: bool,
 
         /// Sanitization profile (balanced or strict)
         #[arg(long = "profile", default_value = "balanced")]
@@ -118,105 +145,185 @@ fn main() {
     match cli.command {
         Commands::Scan {
             path,
+            recursive,
+            jobs,
+            ignore,
             format,
             report,
             fail_on,
             include_values,
         } => {
-            let options = ScanOptions { include_values };
-            match scan_file(&path, &options) {
-                Ok(scan_report) => {
-                    let json_output = match serde_json::to_string_pretty(&scan_report) {
-                        Ok(json) => json,
-                        Err(e) => {
-                            eprintln!("Failed to serialize scan report: {}", e);
-                            process::exit(3);
-                        }
-                    };
+            if path.is_dir() {
+                let opts = BatchScanOptions {
+                    recursive,
+                    jobs,
+                    include_values,
+                    ignore_patterns: ignore,
+                };
+                match scan_directory(&path, &opts) {
+                    Ok(batch_report) => {
+                        let json_output = match serde_json::to_string_pretty(&batch_report) {
+                            Ok(json) => json,
+                            Err(e) => {
+                                eprintln!("Failed to serialize batch report: {}", e);
+                                process::exit(3);
+                            }
+                        };
 
-                    if let Some(ref report_path) = report {
-                        if let Err(e) = fs::write(report_path, &json_output) {
-                            eprintln!("Error writing report file: {}", e);
-                            process::exit(4);
-                        }
-                    }
-
-                    match format {
-                        OutputFormat::Json => {
-                            println!("{}", json_output);
-                        }
-                        OutputFormat::Text => {
-                            println!("Privacy File Guard Scan Report");
-                            println!("==============================");
-                            println!("File: {}", scan_report.input.name);
-                            println!("Format: {}", scan_report.detected_format);
-                            println!("Size: {} bytes", scan_report.input.size);
-                            println!("Findings: {}\n", scan_report.findings.len());
-
-                            for finding in &scan_report.findings {
-                                println!(
-                                    "[{:?}] {} (Source: {:?})",
-                                    finding.severity, finding.key, finding.source
-                                );
-                                if let Some(ref val) = finding.display_value {
-                                    println!("  Value: {}", val);
-                                }
-                                println!("  Risk: {}", finding.risk_explanation);
+                        if let Some(ref report_path) = report {
+                            if let Err(e) = fs::write(report_path, &json_output) {
+                                eprintln!("Error writing report file: {}", e);
+                                process::exit(4);
                             }
                         }
-                    }
 
-                    if let Some(threshold_arg) = fail_on {
-                        let threshold_severity: Severity = threshold_arg.into();
-                        let max_found = scan_report
-                            .findings
-                            .iter()
-                            .map(|f| f.severity)
-                            .max();
-
-                        if let Some(max_sev) = max_found {
-                            if max_sev >= threshold_severity {
-                                process::exit(1);
+                        match format {
+                            OutputFormat::Json => {
+                                println!("{}", json_output);
+                            }
+                            OutputFormat::Text => {
+                                println!("Privacy File Guard Batch Scan Report");
+                                println!("====================================");
+                                println!("Target Directory: {}", batch_report.target_path.display());
+                                println!("Files Scanned: {}", batch_report.files_scanned);
+                                println!("Files Skipped: {}", batch_report.files_skipped);
+                                println!("Total Findings: {}\n", batch_report.total_findings);
                             }
                         }
+                        process::exit(0);
                     }
-
-                    process::exit(0);
+                    Err(e) => {
+                        eprintln!("Batch scan error: {}", e);
+                        process::exit(3);
+                    }
                 }
-                Err(e) => {
-                    eprintln!("Scan error: {}", e);
-                    process::exit(3);
+            } else {
+                let options = ScanOptions { include_values };
+                match scan_file(&path, &options) {
+                    Ok(scan_report) => {
+                        let json_output = match serde_json::to_string_pretty(&scan_report) {
+                            Ok(json) => json,
+                            Err(e) => {
+                                eprintln!("Failed to serialize scan report: {}", e);
+                                process::exit(3);
+                            }
+                        };
+
+                        if let Some(ref report_path) = report {
+                            if let Err(e) = fs::write(report_path, &json_output) {
+                                eprintln!("Error writing report file: {}", e);
+                                process::exit(4);
+                            }
+                        }
+
+                        match format {
+                            OutputFormat::Json => {
+                                println!("{}", json_output);
+                            }
+                            OutputFormat::Text => {
+                                println!("Privacy File Guard Scan Report");
+                                println!("==============================");
+                                println!("File: {}", scan_report.input.name);
+                                println!("Format: {}", scan_report.detected_format);
+                                println!("Size: {} bytes", scan_report.input.size);
+                                println!("Findings: {}\n", scan_report.findings.len());
+
+                                for finding in &scan_report.findings {
+                                    println!(
+                                        "[{:?}] {} (Source: {:?})",
+                                        finding.severity, finding.key, finding.source
+                                    );
+                                    if let Some(ref val) = finding.display_value {
+                                        println!("  Value: {}", val);
+                                    }
+                                    println!("  Risk: {}", finding.risk_explanation);
+                                }
+                            }
+                        }
+
+                        if let Some(threshold_arg) = fail_on {
+                            let threshold_severity: Severity = threshold_arg.into();
+                            let max_found = scan_report
+                                .findings
+                                .iter()
+                                .map(|f| f.severity)
+                                .max();
+
+                            if let Some(max_sev) = max_found {
+                                if max_sev >= threshold_severity {
+                                    process::exit(1);
+                                }
+                            }
+                        }
+
+                        process::exit(0);
+                    }
+                    Err(e) => {
+                        eprintln!("Scan error: {}", e);
+                        process::exit(3);
+                    }
                 }
             }
         }
         Commands::Clean {
             path,
+            recursive,
+            jobs,
+            in_place,
             profile,
             output_dir,
             safe_name,
         } => {
-            let options = CleanOptions {
-                profile: profile.into(),
-                output_dir,
-                safe_name,
-                overwrite: true,
-            };
-
-            match clean_file(&path, &options) {
-                Ok(report) => {
-                    println!("Privacy File Guard Clean Report");
-                    println!("==============================");
-                    println!("Original SHA256: {}", report.original_sha256);
-                    println!("Cleaned SHA256:  {}", report.cleaned_sha256);
-                    println!("Original Findings: {}", report.original_findings_count);
-                    println!("Cleaned Findings:  {}", report.cleaned_findings_count);
-                    println!("Verified Clean: {}", report.verified_clean);
-                    println!("Assurance Level: {}", report.assurance_level);
-                    process::exit(0);
+            if path.is_dir() {
+                let opts = BatchCleanOptions {
+                    recursive,
+                    jobs,
+                    profile: profile.into(),
+                    output_dir,
+                    in_place,
+                    safe_name,
+                    overwrite: true,
+                };
+                match clean_directory(&path, &opts) {
+                    Ok(batch_report) => {
+                        println!("Privacy File Guard Batch Clean Report");
+                        println!("====================================");
+                        println!("Target Directory: {}", batch_report.target_path.display());
+                        println!("Total Files:   {}", batch_report.total_files);
+                        println!("Cleaned Files: {}", batch_report.cleaned_files);
+                        println!("Verified Clean: {}", batch_report.verified_clean_count);
+                        println!("Failed Files:  {}", batch_report.failed_files);
+                        process::exit(0);
+                    }
+                    Err(e) => {
+                        eprintln!("Batch clean error: {}", e);
+                        process::exit(5);
+                    }
                 }
-                Err(e) => {
-                    eprintln!("Clean error: {}", e);
-                    process::exit(5);
+            } else {
+                let options = CleanOptions {
+                    profile: profile.into(),
+                    output_dir,
+                    safe_name,
+                    overwrite: true,
+                };
+
+                match clean_file(&path, &options) {
+                    Ok(report) => {
+                        println!("Privacy File Guard Clean Report");
+                        println!("==============================");
+                        println!("Original SHA256: {}", report.original_sha256);
+                        println!("Cleaned SHA256:  {}", report.cleaned_sha256);
+                        println!("Original Findings: {}", report.original_findings_count);
+                        println!("Cleaned Findings:  {}", report.cleaned_findings_count);
+                        println!("Verified Clean: {}", report.verified_clean);
+                        println!("Assurance Level: {}", report.assurance_level);
+                        process::exit(0);
+                    }
+                    Err(e) => {
+                        eprintln!("Clean error: {}", e);
+                        process::exit(5);
+                    }
                 }
             }
         }
@@ -246,4 +353,3 @@ fn main() {
         }
     }
 }
-

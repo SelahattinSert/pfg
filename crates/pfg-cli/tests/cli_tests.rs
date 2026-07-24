@@ -399,5 +399,47 @@ fn test_cli_office_verify() {
     let _ = fs::remove_dir_all(&temp_dir);
 }
 
+#[test]
+fn test_cli_batch_scan_directory() {
+    let temp_dir = std::env::temp_dir().join("pfg_cli_batch_scan_test");
+    let _ = fs::remove_dir_all(&temp_dir);
+    fs::create_dir_all(&temp_dir).unwrap();
+    fs::copy(get_workspace_root().join("fixtures/images/sample.jpg"), temp_dir.join("sample.jpg")).unwrap();
+
+    let out = Command::new(env!("CARGO_BIN_EXE_pfg"))
+        .current_dir(get_workspace_root())
+        .arg("scan")
+        .arg(&temp_dir)
+        .arg("-r")
+        .output()
+        .unwrap();
+
+    assert!(out.status.success());
+    assert!(String::from_utf8_lossy(&out.stdout).contains("Files Scanned:"));
+
+    let _ = fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_cli_batch_clean_directory() {
+    let temp_dir = std::env::temp_dir().join("pfg_cli_batch_clean_test");
+    let _ = fs::remove_dir_all(&temp_dir);
+    fs::create_dir_all(&temp_dir).unwrap();
+    fs::copy(get_workspace_root().join("fixtures/images/sample.jpg"), temp_dir.join("sample.jpg")).unwrap();
+
+    let out = Command::new(env!("CARGO_BIN_EXE_pfg"))
+        .current_dir(get_workspace_root())
+        .arg("clean")
+        .arg(&temp_dir)
+        .arg("-r")
+        .output()
+        .unwrap();
+
+    assert!(out.status.success());
+    assert!(String::from_utf8_lossy(&out.stdout).contains("Cleaned Files:"));
+
+    let _ = fs::remove_dir_all(&temp_dir);
+}
+
 
 
