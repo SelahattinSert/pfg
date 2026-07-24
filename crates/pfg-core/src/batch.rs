@@ -1,10 +1,11 @@
+use std::fs;
 use std::path::{Path, PathBuf};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
 use pfg_model::{FindingSummary, ScanReport};
 use pfg_policy::CleanProfile;
-use crate::{scan_file, CoreError, ScanOptions, VerificationReport};
+use crate::{clean_file, scan_file, CleanOptions, CoreError, ScanOptions, VerificationReport};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BatchScanOptions {
@@ -129,5 +130,98 @@ pub fn scan_directory(path: &Path, options: &BatchScanOptions) -> Result<BatchSc
         total_findings,
         reports,
         summary: overall_summary,
+    })
+}
+
+pub fn clean_directory(path: &Path, options: &BatchCleanOptions) -> Result<BatchCleanReport, CoreError> {
+    if !path.exists() {
+        return Err(CoreError::IoError(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "Target path does not exist",
+        )));
+    }
+
+    let mut walker = WalkDir::new(path);
+    if !options.recursive {
+        walker = walker.max_depth(1);
+    }
+
+    let target_files: Vec<PathBuf> = walker
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            if e.file_type().is_symlink() || e.file_type().is_dir() {
+                return false;
+            }
+            let name = e.file_name().to_string_lossy();
+            if name.starts_with('.') || name == "node_modules" || name == ".git" {
+                return false;
+            }
+            true
+        })
+        .map(|e| e.path().to_path_buf())
+        .collect();
+
+    let pool = if let Some(jobs) = options.jobs {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(jobs)
+            .build()
+            .ok()
+    } else {
+        None
+    };
+
+    let clean_action = || {
+        target_files
+            .par_iter()
+            .filter_map(|file_path| {
+                let clean_opts = CleanOptions {
+                    profile: options.profile,
+                    output_dir: options.output_dir.clone(),
+                    safe_name: options.safe_name,
+                    overwrite: options.overwrite,
+                };
+                let res = clean_file(file_path, &clean_opts);
+                match res {
+                    Ok(rep) => {
+                        if options.in_place && options.output_dir.is_none() {
+                            let output_name = if options.safe_name {
+                                format!("{}.{}", rep.cleaned_sha256.chars().take(12).collect::<String>(), file_path.extension().and_then(|e| e.to_str()).unwrap_or(""))
+                            } else {
+                                let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
+                                let stem = file_path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+                                format!("{}.pfg.{}", stem, ext)
+                            };
+                            let generated_path = file_path.parent().unwrap_or(Path::new("")).join(output_name);
+                            if generated_path.exists() && generated_path != *file_path {
+                                fs::rename(&generated_path, file_path).ok();
+                            }
+                        }
+                        Some(rep)
+                    }
+                    Err(_) => None,
+                }
+            })
+            .collect::<Vec<VerificationReport>>()
+    };
+
+    let file_reports = if let Some(p) = pool {
+        p.install(clean_action)
+    } else {
+        clean_action()
+    };
+
+    let cleaned_files = file_reports.len();
+    let verified_clean_count = file_reports.iter().filter(|r| r.verified_clean).count();
+    let failed_files = target_files.len().saturating_sub(cleaned_files);
+
+    Ok(BatchCleanReport {
+        target_path: path.to_path_buf(),
+        total_files: target_files.len(),
+        cleaned_files,
+        skipped_files: 0,
+        failed_files,
+        verified_clean_count,
+        file_reports,
     })
 }
