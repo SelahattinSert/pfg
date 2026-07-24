@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::Path;
 use pfg_format_image::{detect_format, scan_jpeg_metadata, ImageFormat};
+use pfg_format_office::{detect_office_format, scan_office_metadata, OfficeFormat};
 use pfg_format_pdf::{detect_pdf_format, scan_pdf_metadata};
 use pfg_model::{FindingSummary, InputFileMetadata, ScanReport, Severity};
 use pfg_policy::PolicyEngine;
@@ -44,6 +45,15 @@ pub fn scan_file(path: &Path, options: &ScanOptions) -> Result<ScanReport, CoreE
         let findings = scan_pdf_metadata(&buffer, &policy)
             .map_err(|e| CoreError::ParseError(e.to_string()))?;
         (findings, "pdf".to_string())
+    } else if let Some(office_fmt) = detect_office_format(&buffer) {
+        let findings = scan_office_metadata(&buffer, &policy)
+            .map_err(|e| CoreError::ParseError(e.to_string()))?;
+        let fmt_str = match office_fmt {
+            OfficeFormat::Docx => "docx",
+            OfficeFormat::Xlsx => "xlsx",
+            OfficeFormat::Pptx => "pptx",
+        };
+        (findings, fmt_str.to_string())
     } else if let Some(format) = detect_format(&buffer) {
         let findings = match format {
             ImageFormat::Jpeg => scan_jpeg_metadata(&buffer, &policy)

@@ -489,6 +489,7 @@ version = "0.1.0"
 dependencies = [
  "lopdf",
  "pfg-format-image",
+ "pfg-format-office",
  "pfg-format-pdf",
  "pfg-model",
  "pfg-policy",
@@ -496,6 +497,7 @@ dependencies = [
  "sha2",
  "thiserror",
  "uuid",
+ "zip",
 ]
 
 [[package]]

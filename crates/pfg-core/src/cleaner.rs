@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use pfg_format_image::{detect_format, sanitize_image};
+use pfg_format_image::{detect_format, sanitize_image, ImageFormat};
+use pfg_format_office::{detect_office_format, sanitize_office, OfficeFormat};
 use pfg_format_pdf::{detect_pdf_format, sanitize_pdf};
 use pfg_policy::CleanProfile;
 use sha2::{Digest, Sha256};
@@ -25,14 +26,28 @@ pub fn clean_file(path: &Path, options: &CleanOptions) -> Result<VerificationRep
 
     let buffer = fs::read(path)?;
 
-    let (sanitized_bytes, is_pdf) = if detect_pdf_format(&buffer) {
+    let (sanitized_bytes, default_ext) = if detect_pdf_format(&buffer) {
         let bytes = sanitize_pdf(&buffer, options.profile)
             .map_err(|e| CoreError::ParseError(e.to_string()))?;
-        (bytes, true)
+        (bytes, Some("pdf"))
+    } else if let Some(office_fmt) = detect_office_format(&buffer) {
+        let bytes = sanitize_office(&buffer, options.profile)
+            .map_err(|e| CoreError::ParseError(e.to_string()))?;
+        let ext = match office_fmt {
+            OfficeFormat::Docx => "docx",
+            OfficeFormat::Xlsx => "xlsx",
+            OfficeFormat::Pptx => "pptx",
+        };
+        (bytes, Some(ext))
     } else if let Some(format) = detect_format(&buffer) {
         let bytes = sanitize_image(&buffer, format, options.profile)
             .map_err(|e| CoreError::ParseError(e.to_string()))?;
-        (bytes, false)
+        let ext = match format {
+            ImageFormat::Jpeg => "jpg",
+            ImageFormat::Png => "png",
+            ImageFormat::WebP => "webp",
+        };
+        (bytes, Some(ext))
     } else {
         return Err(CoreError::UnsupportedFormat);
     };
@@ -49,8 +64,8 @@ pub fn clean_file(path: &Path, options: &CleanOptions) -> Result<VerificationRep
         match ext_str {
             Some(ext) => format!("{}.{}", hash_str, ext),
             None => {
-                if is_pdf {
-                    format!("{}.pdf", hash_str)
+                if let Some(ext) = default_ext {
+                    format!("{}.{}", hash_str, ext)
                 } else {
                     hash_str.to_string()
                 }
@@ -60,8 +75,8 @@ pub fn clean_file(path: &Path, options: &CleanOptions) -> Result<VerificationRep
         match ext_str {
             Some(ext) => format!("{}.pfg.{}", file_stem, ext),
             None => {
-                if is_pdf {
-                    format!("{}.pfg.pdf", file_stem)
+                if let Some(ext) = default_ext {
+                    format!("{}.pfg.{}", file_stem, ext)
                 } else {
                     format!("{}.pfg", file_stem)
                 }

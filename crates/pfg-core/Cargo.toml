@@ -9,6 +9,7 @@ pfg-model = { path = "../pfg-model" }
 pfg-policy = { path = "../pfg-policy" }
 pfg-format-image = { path = "../pfg-format-image" }
 pfg-format-pdf = { path = "../pfg-format-pdf" }
+pfg-format-office = { path = "../pfg-format-office" }
 sha2 = "0.10"
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
@@ -16,4 +17,5 @@ uuid = { version = "1.4", features = ["v4"] }
 
 [dev-dependencies]
 lopdf = "0.31"
+zip = { version = "0.6", default-features = false }
 
