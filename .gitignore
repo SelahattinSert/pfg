@@ -1,11 +1,12 @@
-# Rust & Build Artifacts
+# Rust Build Output
 /target
 crates/**/target
-Cargo.lock
 
-# Frontend & Node
+# Frontend Build & Node Modules
 node_modules
-ui/dist
+dist
+**/dist
+crates/pfg-desktop/dist
 crates/pfg-desktop/ui/dist
 crates/pfg-desktop/ui/node_modules
 
