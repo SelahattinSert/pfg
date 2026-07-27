@@ -1,2 +1,18 @@
+# Rust & Build Artifacts
 /target
+crates/**/target
+Cargo.lock
+
+# Frontend & Node
 node_modules
+ui/dist
+crates/pfg-desktop/ui/dist
+crates/pfg-desktop/ui/node_modules
+
+# Internal Planning & Development Docs
+docs/superpowers/
+
+# OS & Temp Files
+.DS_Store
+*.tmp
+*.log
