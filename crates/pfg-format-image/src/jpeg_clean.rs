@@ -1,6 +1,6 @@
 use crate::exif::extract_orientation;
 use crate::jpeg::ImageParseError;
-use image::{imageops, ImageFormat};
+use image::ImageFormat;
 use pfg_policy::CleanProfile;
 use std::io::Cursor;
 
@@ -52,9 +52,9 @@ pub fn sanitize_jpeg(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, Im
                     2 => dynamic_img.fliph(),
                     3 => dynamic_img.rotate180(),
                     4 => dynamic_img.flipv(),
-                    5 => imageops::rotate90(&dynamic_img.fliph()).into(),
+                    5 => dynamic_img.rotate270().fliph(),
                     6 => dynamic_img.rotate90(),
-                    7 => imageops::rotate270(&dynamic_img.fliph()).into(),
+                    7 => dynamic_img.rotate90().fliph(),
                     8 => dynamic_img.rotate270(),
                     _ => dynamic_img,
                 };
