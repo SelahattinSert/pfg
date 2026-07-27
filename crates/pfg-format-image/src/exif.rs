@@ -68,6 +68,56 @@ pub fn parse_exif(exif_bytes: &[u8], policy: &PolicyEngine) -> Vec<Finding> {
     findings
 }
 
+pub fn extract_orientation(exif_bytes: &[u8]) -> Option<u16> {
+    if exif_bytes.len() < 8 {
+        return None;
+    }
+
+    let endian = match &exif_bytes[0..2] {
+        b"II" => Endian::Little,
+        b"MM" => Endian::Big,
+        _ => return None,
+    };
+
+    let magic = endian.read_u16(&exif_bytes[2..4]);
+    if magic != Some(42) {
+        return None;
+    }
+
+    let ifd0_offset = match endian.read_u32(&exif_bytes[4..8]) {
+        Some(offset) => offset as usize,
+        None => return None,
+    };
+
+    if ifd0_offset + 2 > exif_bytes.len() {
+        return None;
+    }
+
+    let num_entries = match endian.read_u16(&exif_bytes[ifd0_offset..ifd0_offset + 2]) {
+        Some(n) => n as usize,
+        None => return None,
+    };
+
+    let entries_start = ifd0_offset + 2;
+    if entries_start + num_entries * 12 > exif_bytes.len() {
+        return None;
+    }
+
+    for i in 0..num_entries {
+        let entry_offset = entries_start + i * 12;
+        let tag = match endian.read_u16(&exif_bytes[entry_offset..entry_offset + 2]) {
+            Some(t) => t,
+            None => continue,
+        };
+        if tag == 0x0112 {
+            let val_bytes = &exif_bytes[entry_offset + 8..entry_offset + 12];
+            return endian.read_u16(val_bytes);
+        }
+    }
+
+    None
+}
+
 fn parse_ifd(
     exif_bytes: &[u8],
     ifd_offset: usize,

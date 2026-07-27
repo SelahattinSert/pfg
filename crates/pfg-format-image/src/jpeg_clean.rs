@@ -1,7 +1,75 @@
+use crate::exif::extract_orientation;
 use crate::jpeg::ImageParseError;
+use image::{imageops, ImageFormat};
 use pfg_policy::CleanProfile;
+use std::io::Cursor;
 
 pub fn sanitize_jpeg(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, ImageParseError> {
+    if buffer.len() < 2 || buffer[0] != 0xFF || buffer[1] != 0xD8 {
+        return Err(ImageParseError::InvalidSoi);
+    }
+
+    // 1. Scan for EXIF Orientation tag in APP1 marker before stripping
+    let mut detected_orientation = None;
+    let mut cursor = 2;
+    while cursor < buffer.len() {
+        if buffer[cursor] != 0xFF {
+            break;
+        }
+        while cursor < buffer.len() && buffer[cursor] == 0xFF {
+            cursor += 1;
+        }
+        if cursor >= buffer.len() {
+            break;
+        }
+        let marker = buffer[cursor];
+        cursor += 1;
+        if marker == 0xD9 || marker == 0xDA {
+            break;
+        }
+        if cursor + 2 > buffer.len() {
+            break;
+        }
+        let length = u16::from_be_bytes([buffer[cursor], buffer[cursor + 1]]) as usize;
+        if length < 2 || cursor + length > buffer.len() {
+            break;
+        }
+        let payload = &buffer[cursor + 2..cursor + length];
+        if marker == 0xE1 && payload.starts_with(b"Exif\0\0") && payload.len() >= 6 {
+            detected_orientation = extract_orientation(&payload[6..]);
+            if detected_orientation.is_some() {
+                break;
+            }
+        }
+        cursor += length;
+    }
+
+    // 2. If EXIF Orientation requires physical rotation (orientation > 1), auto-orient pixels
+    if let Some(orient) = detected_orientation {
+        if orient > 1 && orient <= 8 {
+            if let Ok(mut dynamic_img) = image::load_from_memory_with_format(buffer, ImageFormat::Jpeg) {
+                dynamic_img = match orient {
+                    2 => dynamic_img.fliph(),
+                    3 => dynamic_img.rotate180(),
+                    4 => dynamic_img.flipv(),
+                    5 => imageops::rotate90(&dynamic_img.fliph()).into(),
+                    6 => dynamic_img.rotate90(),
+                    7 => imageops::rotate270(&dynamic_img.fliph()).into(),
+                    8 => dynamic_img.rotate270(),
+                    _ => dynamic_img,
+                };
+                let mut out_bytes = Vec::new();
+                if dynamic_img.write_to(&mut Cursor::new(&mut out_bytes), ImageFormat::Jpeg).is_ok() {
+                    return strip_jpeg_metadata(&out_bytes, profile);
+                }
+            }
+        }
+    }
+
+    strip_jpeg_metadata(buffer, profile)
+}
+
+fn strip_jpeg_metadata(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, ImageParseError> {
     if buffer.len() < 2 || buffer[0] != 0xFF || buffer[1] != 0xD8 {
         return Err(ImageParseError::InvalidSoi);
     }
@@ -17,7 +85,6 @@ pub fn sanitize_jpeg(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, Im
             return Err(ImageParseError::InvalidMarkerStructure);
         }
 
-        // Skip extra 0xFF padding bytes
         while cursor < buffer.len() && buffer[cursor] == 0xFF {
             cursor += 1;
         }
@@ -29,16 +96,14 @@ pub fn sanitize_jpeg(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, Im
         let marker = buffer[cursor];
         cursor += 1;
 
-        // Standalone markers with no length payload
         match marker {
-            0xD8 => continue, // SOI
+            0xD8 => continue,
             0xD9 => {
-                // EOI - End of image
                 output.push(0xFF);
                 output.push(0xD9);
                 break;
             }
-            0x00 => continue, // Escaped byte
+            0x00 => continue,
             0xD0..=0xD7 => {
                 output.push(0xFF);
                 output.push(marker);
@@ -47,7 +112,6 @@ pub fn sanitize_jpeg(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, Im
             _ => {}
         }
 
-        // Markers with 2-byte Big-Endian length parameter
         if cursor + 2 > buffer.len() {
             return Err(ImageParseError::UnexpectedEof);
         }
@@ -64,7 +128,6 @@ pub fn sanitize_jpeg(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, Im
         let segment_payload = &buffer[cursor + 2..cursor + length];
 
         if marker == 0xDA {
-            // SOS (Start of Scan) header parsed, image entropy data follows
             output.push(0xFF);
             output.push(0xDA);
             output.push(buffer[cursor]);
@@ -72,7 +135,6 @@ pub fn sanitize_jpeg(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, Im
             output.extend_from_slice(segment_payload);
             cursor += length;
 
-            // Append all remaining entropy payload (up to and including EOI)
             if cursor < buffer.len() {
                 output.extend_from_slice(&buffer[cursor..]);
             }
@@ -80,8 +142,8 @@ pub fn sanitize_jpeg(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, Im
         }
 
         let strip = match marker {
-            0xE1 | 0xED | 0xFE => true, // APP1 (EXIF/XMP), APP13 (IPTC/Photoshop), COM (Comment)
-            0xE2..=0xEC | 0xEE..=0xEF if profile == CleanProfile::Strict => true, // Other APP markers in Strict mode
+            0xE1 | 0xED | 0xFE => true,
+            0xE2..=0xEC | 0xEE..=0xEF if profile == CleanProfile::Strict => true,
             _ => false,
         };
 

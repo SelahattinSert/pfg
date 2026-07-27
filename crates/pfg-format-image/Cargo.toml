@@ -10,4 +10,5 @@ pfg-model = { path = "../pfg-model" }
 pfg-policy = { path = "../pfg-policy" }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
 
