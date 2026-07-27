@@ -16,7 +16,10 @@ pub fn verify_files(original_path: &Path, cleaned_path: &Path) -> Result<Verific
     let original_scan = scan_file(original_path, &ScanOptions { include_values: true })?;
     let cleaned_scan = scan_file(cleaned_path, &ScanOptions { include_values: true })?;
 
-    let verified = cleaned_scan.findings.is_empty();
+    let verified = cleaned_scan
+        .findings
+        .iter()
+        .all(|f| f.severity == pfg_model::Severity::Informational);
 
     Ok(VerificationReport {
         original_sha256: original_scan.input.sha256,

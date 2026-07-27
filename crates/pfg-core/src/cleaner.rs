@@ -111,10 +111,15 @@ pub fn clean_file(path: &Path, options: &CleanOptions) -> Result<VerificationRep
         }
     };
 
-    if !cleaned_scan.findings.is_empty() {
+    let has_privacy_risks = cleaned_scan
+        .findings
+        .iter()
+        .any(|f| f.severity != pfg_model::Severity::Informational);
+
+    if has_privacy_risks {
         let _ = fs::remove_file(&tmp_path);
         return Err(CoreError::ParseError(
-            "Post-clean verification failed: findings still present".to_string(),
+            "Post-clean verification failed: privacy findings still present".to_string(),
         ));
     }
 
