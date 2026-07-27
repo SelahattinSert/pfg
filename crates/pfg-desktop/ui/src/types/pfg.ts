@@ -4,6 +4,7 @@
  */
 
 export type Severity = 'informational' | 'low' | 'medium' | 'high' | 'critical';
+export type FindingSeverity = Severity;
 
 export type FindingCategory =
   | 'location'
