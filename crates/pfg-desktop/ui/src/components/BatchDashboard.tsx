@@ -473,8 +473,8 @@ export const BatchDashboard: React.FC<BatchDashboardProps> = ({
                           <div className="flex items-center gap-2">
                             <FileText className="w-4 h-4 text-indigo-400 flex-shrink-0" />
                             <div>
-                              <span className="font-semibold text-slate-100 block group-hover:text-indigo-300 transition-colors">
-                                {fileReport.input.name}
+                              <span className="font-semibold text-slate-100 block group-hover:text-indigo-300 transition-colors" title={fileReport.input.name}>
+                                {fileReport.input.name.split('/').pop() || fileReport.input.name}
                               </span>
                               <span className="text-[10px] font-mono text-slate-500">
                                 {fileReport.input.sha256.substring(0, 12)}...

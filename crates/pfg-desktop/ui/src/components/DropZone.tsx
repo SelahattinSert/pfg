@@ -50,6 +50,35 @@ export const DropZone: React.FC<DropZoneProps> = ({
   const [isDragActive, setIsDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  React.useEffect(() => {
+    let unlistenFn: (() => void) | undefined;
+    const setupListener = async () => {
+      try {
+        const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+        const appWindow = getCurrentWebviewWindow();
+        unlistenFn = await appWindow.onDragDropEvent((event) => {
+          if (event.payload.type === 'drop') {
+            setIsDragActive(false);
+            const paths = event.payload.paths;
+            if (paths && paths.length > 0) {
+              onFileSelect(paths[0]);
+            }
+          } else if (event.payload.type === 'enter' || event.payload.type === 'over') {
+            setIsDragActive(true);
+          } else {
+            setIsDragActive(false);
+          }
+        });
+      } catch (_e) {
+        // Fallback for non-Tauri browser dev mode
+      }
+    };
+    setupListener();
+    return () => {
+      if (unlistenFn) unlistenFn();
+    };
+  }, [onFileSelect]);
+
   const handleDragEnter = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -79,16 +108,26 @@ export const DropZone: React.FC<DropZoneProps> = ({
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const file = e.dataTransfer.files[0];
-      const path = (file as unknown as { path?: string }).path || file.name;
-      onFileSelect(path, file);
+      const rawPath = (file as unknown as { path?: string }).path || '';
+      // If path is absolute (starts with / or letter:\), use it directly
+      if (rawPath && (rawPath.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(rawPath))) {
+        onFileSelect(rawPath, file);
+      } else {
+        // Fallback to native OS dialog to guarantee full absolute path resolution
+        handleBrowseClick();
+      }
     }
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
-      const path = (file as unknown as { path?: string }).path || file.name;
-      onFileSelect(path, file);
+      const rawPath = (file as unknown as { path?: string }).path || '';
+      if (rawPath && (rawPath.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(rawPath))) {
+        onFileSelect(rawPath, file);
+      } else {
+        handleBrowseClick();
+      }
     }
   };
 

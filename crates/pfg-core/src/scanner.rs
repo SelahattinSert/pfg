@@ -91,8 +91,7 @@ pub fn scan_file(path: &Path, options: &ScanOptions) -> Result<ScanReport, CoreE
     }
 
     let filename = path
-        .file_name()
-        .and_then(|n| n.to_str())
+        .to_str()
         .unwrap_or("unknown")
         .to_string();
 

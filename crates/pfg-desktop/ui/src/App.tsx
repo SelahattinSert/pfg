@@ -588,8 +588,9 @@ export const App: React.FC = () => {
   );
 
   const handleInspectFileFromBatch = useCallback((fileReport: ScanReport) => {
-    setSelectedFilePath(fileReport.input.name);
-    setSelectedFileName(fileReport.input.name);
+    const fullPath = fileReport.input.name;
+    setSelectedFilePath(fullPath);
+    setSelectedFileName(fullPath.split('/').pop() || fullPath);
     setSelectedFileSize(fileReport.input.size);
     setReport(fileReport);
     setVerificationReport(null);
