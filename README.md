@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/badge/License-MPL--2.0-brightgreen.svg)](LICENSE)
 [![Security](https://img.shields.io/badge/Unsafe-Forbidden-success.svg)](crates/pfg-core/src/lib.rs)
 
-**Privacy File Guard (PFG)** is a high-performance, 100% local enterprise-grade metadata auditing and privacy sanitization engine built in Rust and Tauri 2. It scans, audits, and redacts sensitive metadata, location data (GPS), hardware specifications, author details, and security vulnerabilities from images (JPEG, PNG, WebP), PDF documents, and Microsoft Office files (`.docx`, `.xlsx`, `.pptx`).
+> **Privacy File Guard is a 100% local, zero-cloud metadata audit and sanitization tool that prevents privacy leaks by scanning and removing hidden location data, device identifiers, and security risks from images, PDFs, and Office documents.**
 
 ---
 
