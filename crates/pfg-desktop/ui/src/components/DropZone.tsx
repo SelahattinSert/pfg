@@ -1,4 +1,5 @@
 import React, { useState, useRef, DragEvent, ChangeEvent } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import {
   UploadCloud,
   FileText,
@@ -78,7 +79,6 @@ export const DropZone: React.FC<DropZoneProps> = ({
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const file = e.dataTransfer.files[0];
-      // In Tauri runtime, file object has a 'path' property
       const path = (file as unknown as { path?: string }).path || file.name;
       onFileSelect(path, file);
     }
@@ -92,11 +92,19 @@ export const DropZone: React.FC<DropZoneProps> = ({
     }
   };
 
-  const handleBrowseClick = () => {
+  const handleBrowseClick = async () => {
     if (isLoading) return;
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-      fileInputRef.current.click();
+    try {
+      const selectedPath = await invoke<string | null>('select_file_dialog_cmd');
+      if (selectedPath) {
+        onFileSelect(selectedPath);
+        return;
+      }
+    } catch (_err) {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+        fileInputRef.current.click();
+      }
     }
   };
 

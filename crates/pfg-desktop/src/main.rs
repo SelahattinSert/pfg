@@ -3,7 +3,8 @@
 mod commands;
 
 use commands::{
-    clean_directory_cmd, clean_file_cmd, scan_directory_cmd, scan_file_cmd, verify_files_cmd,
+    clean_directory_cmd, clean_file_cmd, scan_directory_cmd, scan_file_cmd,
+    select_file_dialog_cmd, select_folder_dialog_cmd, verify_files_cmd,
 };
 
 fn main() {
@@ -14,6 +15,8 @@ fn main() {
             verify_files_cmd,
             scan_directory_cmd,
             clean_directory_cmd,
+            select_file_dialog_cmd,
+            select_folder_dialog_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

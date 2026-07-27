@@ -20,6 +20,23 @@ fn parse_profile(profile_str: &str) -> Result<CleanProfile, String> {
 }
 
 #[tauri::command]
+pub fn select_file_dialog_cmd() -> Result<Option<String>, String> {
+    let file = rfd::FileDialog::new()
+        .add_filter(
+            "Supported Privacy Files",
+            &["jpg", "jpeg", "png", "webp", "pdf", "docx", "xlsx", "pptx"],
+        )
+        .pick_file();
+    Ok(file.map(|p| p.to_string_lossy().to_string()))
+}
+
+#[tauri::command]
+pub fn select_folder_dialog_cmd() -> Result<Option<String>, String> {
+    let folder = rfd::FileDialog::new().pick_folder();
+    Ok(folder.map(|p| p.to_string_lossy().to_string()))
+}
+
+#[tauri::command]
 pub fn scan_file_cmd(path: String, include_values: bool) -> Result<ScanReport, String> {
     let path_buf = PathBuf::from(&path);
     let options = ScanOptions { include_values };

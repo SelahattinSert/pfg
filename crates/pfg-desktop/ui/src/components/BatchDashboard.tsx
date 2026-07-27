@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import {
   FolderSearch,
   Sparkles,
@@ -50,6 +51,17 @@ export const BatchDashboard: React.FC<BatchDashboardProps> = ({
   const [ignorePatternsStr, setIgnorePatternsStr] = useState<string>('*.tmp, .git, node_modules');
   const [profile, setProfile] = useState<CleanProfile>('Balanced');
   const [inPlace, setInPlace] = useState<boolean>(true);
+
+  const handleBrowseFolder = async () => {
+    try {
+      const selected = await invoke<string | null>('select_folder_dialog_cmd');
+      if (selected) {
+        setDirPath(selected);
+      }
+    } catch (_e) {
+      // Ignored
+    }
+  };
 
   const handleScanSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,6 +166,16 @@ export const BatchDashboard: React.FC<BatchDashboardProps> = ({
                 disabled={isLoading || isCleaning}
               />
             </div>
+
+            <button
+              type="button"
+              onClick={handleBrowseFolder}
+              disabled={isLoading || isCleaning}
+              className="btn-secondary py-3 px-4 text-xs font-semibold flex items-center justify-center gap-2 whitespace-nowrap text-slate-300 border-slate-700 hover:border-indigo-500/60"
+            >
+              <FolderOpen className="w-4 h-4 text-indigo-400" />
+              <span>Browse Folder</span>
+            </button>
 
             <div className="flex items-center gap-2">
               <button
