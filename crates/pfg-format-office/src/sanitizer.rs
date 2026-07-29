@@ -1,18 +1,12 @@
+use crate::detector::detect_office_format;
+use crate::OfficeParseError;
+use pfg_policy::CleanProfile;
 use quick_xml::events::Event;
-use quick_xml::reader::Reader;
-use quick_xml::writer::Writer;
+use quick_xml::{Reader, Writer};
 use std::io::{Cursor, Read, Write};
 use zip::write::FileOptions;
 use zip::{ZipArchive, ZipWriter};
 
-use pfg_policy::CleanProfile;
-
-use crate::detector::detect_office_format;
-use crate::scanner::OfficeParseError;
-
-/// Sanitizes an Office Open XML document (DOCX, XLSX, PPTX) by redacting
-/// metadata in `docProps/core.xml` and `docProps/app.xml`, stripping custom properties,
-/// thumbnails, VBA macros, stripping comments in `Strict` mode, and cleaning relationships.
 pub fn sanitize_office(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, OfficeParseError> {
     // 1. Check magic bytes
     if buffer.len() < 4 || &buffer[0..4] != b"PK\x03\x04" {
@@ -51,80 +45,76 @@ pub fn sanitize_office(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, 
     let mut stripped_parts = Vec::new();
     for i in 0..archive.len() {
         if let Ok(file) = archive.by_index(i) {
-            let name = file.name();
-            if should_strip_entry(name, profile) {
-                stripped_parts.push(name.to_string());
+            let name = file.name().to_string();
+            if is_stripped_part(&name, profile) {
+                stripped_parts.push(name);
             }
         }
     }
 
-    // Pass 2: Rebuild zip archive
-    let mut output_buf = Vec::new();
-    {
-        let output_cursor = Cursor::new(&mut output_buf);
-        let mut zip_out = ZipWriter::new(output_cursor);
+    // Pass 2: Build new ZIP container
+    let output_cursor = Cursor::new(Vec::new());
+    let mut zip_writer = ZipWriter::new(output_cursor);
 
-        for i in 0..archive.len() {
-            let mut file = archive
-                .by_index(i)
-                .map_err(|err| OfficeParseError::CorruptedZip(err.to_string()))?;
-            let name = file.name().to_string();
+    for i in 0..archive.len() {
+        let mut file = archive
+            .by_index(i)
+            .map_err(|err| OfficeParseError::CorruptedZip(err.to_string()))?;
+        let name = file.name().to_string();
 
-            // Check if entry should be stripped
-            if should_strip_entry(&name, profile) {
-                continue;
-            }
-
-            let mut contents = Vec::new();
-            file.read_to_end(&mut contents)
-                .map_err(|err| OfficeParseError::CorruptedZip(err.to_string()))?;
-
-            let options = FileOptions::default().compression_method(file.compression());
-
-            let final_contents = if name == "docProps/core.xml" {
-                redact_core_xml(&contents)
-            } else if name == "docProps/app.xml" {
-                redact_app_xml(&contents)
-            } else if name == "[Content_Types].xml" {
-                clean_content_types_xml(&contents, &stripped_parts)
-            } else if name.ends_with(".rels") {
-                clean_rels_xml(&contents, &stripped_parts)
-            } else {
-                contents
-            };
-
-            zip_out
-                .start_file(name, options)
-                .map_err(|err| OfficeParseError::CorruptedZip(err.to_string()))?;
-            zip_out
-                .write_all(&final_contents)
-                .map_err(|err| OfficeParseError::CorruptedZip(err.to_string()))?;
+        if is_stripped_part(&name, profile) {
+            continue;
         }
 
-        zip_out
-            .finish()
+        let mut content = Vec::new();
+        file.read_to_end(&mut content)
+            .map_err(|err| OfficeParseError::CorruptedZip(err.to_string()))?;
+
+        // Sanitize specific XML streams
+        let final_content = if name == "docProps/core.xml" {
+            redact_core_xml(&content)
+        } else if name == "docProps/app.xml" {
+            redact_app_xml(&content)
+        } else if name == "[Content_Types].xml" {
+            clean_content_types_xml(&content, &stripped_parts)
+        } else if name.ends_with(".rels") {
+            clean_rels_xml(&content, &stripped_parts)
+        } else {
+            content
+        };
+
+        let options = FileOptions::default()
+            .compression_method(file.compression())
+            .unix_permissions(file.unix_mode().unwrap_or(0o644));
+
+        zip_writer
+            .start_file(name, options)
+            .map_err(|err| OfficeParseError::CorruptedZip(err.to_string()))?;
+        zip_writer
+            .write_all(&final_content)
             .map_err(|err| OfficeParseError::CorruptedZip(err.to_string()))?;
     }
 
-    Ok(output_buf)
+    let output_cursor = zip_writer
+        .finish()
+        .map_err(|err| OfficeParseError::CorruptedZip(err.to_string()))?;
+
+    Ok(output_cursor.into_inner())
 }
 
-fn should_strip_entry(name: &str, profile: CleanProfile) -> bool {
-    // 1. docProps/custom.xml
+fn is_stripped_part(name: &str, profile: CleanProfile) -> bool {
+    // 1. Always strip custom properties XML
     if name == "docProps/custom.xml" {
         return true;
     }
 
-    // 2. docProps/thumbnail.*
-    if name.starts_with("docProps/thumbnail.") {
+    // 2. Always strip thumbnails
+    if name.starts_with("docProps/thumbnail.") || name.starts_with("docProps/thumbnail") {
         return true;
     }
 
-    // 3. vbaProject.bin, word/vbaProject.bin, xl/vbaProject.bin, etc.
-    if name == "vbaProject.bin"
-        || name.ends_with("/vbaProject.bin")
-        || name.contains("vbaProject.bin")
-    {
+    // 3. Always strip VBA macro binaries
+    if name.ends_with("vbaProject.bin") || name.contains("vbaData.xml") {
         return true;
     }
 
@@ -143,13 +133,16 @@ fn should_strip_entry(name: &str, profile: CleanProfile) -> bool {
 
 fn clean_content_types_xml(content: &[u8], stripped_parts: &[String]) -> Vec<u8> {
     let mut reader = Reader::from_reader(content);
-    reader.trim_text(true);
+    reader.trim_text(false);
     let mut writer = Writer::new(Cursor::new(Vec::new()));
     let mut buf = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+            Ok(Event::Start(e)) => {
+                let _ = writer.write_event(Event::Start(e));
+            }
+            Ok(Event::Empty(e)) => {
                 let name = e.name();
                 if name.as_ref() == b"Override" {
                     let mut should_skip = false;
@@ -167,6 +160,7 @@ fn clean_content_types_xml(content: &[u8], stripped_parts: &[String]) -> Vec<u8>
                         }
                     }
                     if should_skip {
+                        buf.clear();
                         continue;
                     }
                 }
@@ -186,13 +180,16 @@ fn clean_content_types_xml(content: &[u8], stripped_parts: &[String]) -> Vec<u8>
 
 fn clean_rels_xml(content: &[u8], stripped_parts: &[String]) -> Vec<u8> {
     let mut reader = Reader::from_reader(content);
-    reader.trim_text(true);
+    reader.trim_text(false);
     let mut writer = Writer::new(Cursor::new(Vec::new()));
     let mut buf = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+            Ok(Event::Start(e)) => {
+                let _ = writer.write_event(Event::Start(e));
+            }
+            Ok(Event::Empty(e)) => {
                 let name = e.name();
                 if name.as_ref() == b"Relationship" {
                     let mut should_skip = false;
@@ -209,6 +206,7 @@ fn clean_rels_xml(content: &[u8], stripped_parts: &[String]) -> Vec<u8> {
                         }
                     }
                     if should_skip {
+                        buf.clear();
                         continue;
                     }
                 }
@@ -226,138 +224,86 @@ fn clean_rels_xml(content: &[u8], stripped_parts: &[String]) -> Vec<u8> {
     writer.into_inner().into_inner()
 }
 
+fn redact_xml_element_content(content: &[u8], target_local_names: &[&[u8]]) -> Vec<u8> {
+    let mut reader = Reader::from_reader(content);
+    reader.trim_text(false);
+    let mut writer = Writer::new(Cursor::new(Vec::new()));
+    let mut buf = Vec::new();
+    let mut current_redact_depth: usize = 0;
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                let local_name = e.name().into_inner();
+                let local = if let Some(idx) = local_name.iter().position(|&b| b == b':') {
+                    &local_name[idx + 1..]
+                } else {
+                    local_name
+                };
+
+                let is_target = target_local_names.contains(&local);
+                let _ = writer.write_event(Event::Start(e));
+
+                if is_target {
+                    current_redact_depth += 1;
+                }
+            }
+            Ok(Event::End(e)) => {
+                let local_name = e.name().into_inner();
+                let local = if let Some(idx) = local_name.iter().position(|&b| b == b':') {
+                    &local_name[idx + 1..]
+                } else {
+                    local_name
+                };
+
+                let is_target = target_local_names.contains(&local);
+                let _ = writer.write_event(Event::End(e));
+
+                if is_target && current_redact_depth > 0 {
+                    current_redact_depth -= 1;
+                }
+            }
+            Ok(Event::Text(e)) => {
+                if current_redact_depth > 0 {
+                    buf.clear();
+                    continue;
+                } else {
+                    let _ = writer.write_event(Event::Text(e));
+                }
+            }
+            Ok(Event::Eof) => break,
+            Ok(event) => {
+                let _ = writer.write_event(event);
+            }
+            Err(_) => return content.to_vec(),
+        }
+        buf.clear();
+    }
+
+    writer.into_inner().into_inner()
+}
+
 fn redact_core_xml(content: &[u8]) -> Vec<u8> {
-    let text = match std::str::from_utf8(content) {
-        Ok(s) => s,
-        Err(_) => return content.to_vec(),
-    };
-
-    let tags = &[
-        "creator",
-        "lastModifiedBy",
-        "created",
-        "modified",
-        "title",
-        "subject",
-        "keywords",
+    let tags: &[&[u8]] = &[
+        b"creator",
+        b"lastModifiedBy",
+        b"created",
+        b"modified",
+        b"title",
+        b"subject",
+        b"keywords",
+        b"description",
     ];
-
-    redact_xml_tags(text, tags).into_bytes()
+    redact_xml_element_content(content, tags)
 }
 
 fn redact_app_xml(content: &[u8]) -> Vec<u8> {
-    let text = match std::str::from_utf8(content) {
-        Ok(s) => s,
-        Err(_) => return content.to_vec(),
-    };
-
-    let tags = &[
-        "Company",
-        "Manager",
-        "Application",
-        "AppVersion",
-        "TotalTime",
+    let tags: &[&[u8]] = &[
+        b"Company",
+        b"Manager",
+        b"Application",
+        b"AppVersion",
+        b"TotalTime",
     ];
-
-    redact_xml_tags(text, tags).into_bytes()
-}
-
-fn redact_xml_tags(xml: &str, target_local_names: &[&str]) -> String {
-    let mut result = String::with_capacity(xml.len());
-    let mut search_idx = 0;
-
-    while search_idx < xml.len() {
-        let open_rel = match xml[search_idx..].find('<') {
-            Some(idx) => idx,
-            None => {
-                result.push_str(&xml[search_idx..]);
-                break;
-            }
-        };
-
-        let open_start = search_idx + open_rel;
-        result.push_str(&xml[search_idx..open_start]);
-
-        let open_end_rel = match xml[open_start..].find('>') {
-            Some(idx) => idx,
-            None => {
-                result.push_str(&xml[open_start..]);
-                break;
-            }
-        };
-        let open_end = open_start + open_end_rel;
-        let tag_header = &xml[open_start + 1..open_end];
-
-        if tag_header.starts_with('?') || tag_header.starts_with('!') || tag_header.starts_with('/')
-        {
-            result.push_str(&xml[open_start..=open_end]);
-            search_idx = open_end + 1;
-            continue;
-        }
-
-        let is_self_closing = tag_header.ends_with('/');
-        let tag_name_part = if is_self_closing {
-            tag_header[..tag_header.len() - 1].trim()
-        } else {
-            tag_header.trim()
-        };
-
-        let tag_name = tag_name_part.split_whitespace().next().unwrap_or("");
-        let local_name = if let Some((_prefix, local)) = tag_name.split_once(':') {
-            local
-        } else {
-            tag_name
-        };
-
-        if target_local_names.contains(&local_name) {
-            if is_self_closing {
-                result.push_str(&xml[open_start..=open_end]);
-                search_idx = open_end + 1;
-                continue;
-            }
-
-            // Find matching closing tag
-            let mut close_search = open_end + 1;
-            let mut found_close = None;
-
-            while close_search < xml.len() {
-                if let Some(c_start_rel) = xml[close_search..].find("</") {
-                    let c_start_abs = close_search + c_start_rel;
-                    if let Some(c_end_rel) = xml[c_start_abs..].find('>') {
-                        let c_end_abs = c_start_abs + c_end_rel;
-                        let close_header = xml[c_start_abs + 2..c_end_abs].trim();
-                        let close_local =
-                            if let Some((_prefix, local)) = close_header.split_once(':') {
-                                local
-                            } else {
-                                close_header
-                            };
-                        if close_local == local_name {
-                            found_close = Some((c_start_abs, c_end_abs));
-                            break;
-                        } else {
-                            close_search = c_end_abs + 1;
-                            continue;
-                        }
-                    }
-                }
-                break;
-            }
-
-            if let Some((c_start_abs, c_end_abs)) = found_close {
-                // Keep opening tag <tag_name ...> and closing tag </tag_name>, but empty inner content
-                result.push_str(&xml[open_start..=open_end]);
-                result.push_str(&xml[c_start_abs..=c_end_abs]);
-                search_idx = c_end_abs + 1;
-            } else {
-                result.push_str(&xml[open_start..=open_end]);
-                search_idx = open_end + 1;
-            }
-        } else {
-            result.push_str(&xml[open_start..=open_end]);
-            search_idx = open_end + 1;
-        }
-    }
-
-    result
+    redact_xml_element_content(content, tags)
 }

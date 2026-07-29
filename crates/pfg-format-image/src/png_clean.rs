@@ -27,10 +27,30 @@ pub fn sanitize_png(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, Ima
         }
 
         let is_removable = match profile {
-            CleanProfile::Balanced => matches!(
-                chunk_type,
-                b"eXIf" | b"tEXt" | b"zTXt" | b"iTXt" | b"tIME" | b"dSIG" | b"gIFg" | b"gIFx"
-            ),
+            CleanProfile::Balanced => match chunk_type {
+                b"eXIf" | b"tIME" | b"dSIG" | b"gIFg" | b"gIFx" => true,
+                b"tEXt" | b"zTXt" | b"iTXt" => {
+                    let data_slice = &buffer[cursor + 8..cursor + 8 + length];
+                    let key_str = data_slice
+                        .split(|&b| b == 0)
+                        .next()
+                        .and_then(|s| std::str::from_utf8(s).ok())
+                        .unwrap_or("")
+                        .to_lowercase();
+                    matches!(
+                        key_str.as_str(),
+                        "" | "metadata"
+                            | "author"
+                            | "description"
+                            | "software"
+                            | "creation time"
+                            | "comment"
+                            | "title"
+                            | "copyright"
+                    )
+                }
+                _ => false,
+            },
             CleanProfile::Strict => matches!(
                 chunk_type,
                 b"eXIf"

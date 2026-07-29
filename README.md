@@ -64,7 +64,7 @@ Standard Rust toolchain (`cargo`).
 
 ```bash
 git clone https://github.com/SelahattinSert/pfg.git
-cd pfg/privacy-file-guard-source
+cd pfg
 
 # Execute full workspace unit & integration test suite
 cargo test --workspace

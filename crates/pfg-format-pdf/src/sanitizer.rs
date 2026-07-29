@@ -106,7 +106,7 @@ pub fn sanitize_pdf(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, Pdf
     // 4. Perform post-sanitization structural validation
     let validation = validate_pdf_structure(&bytes)?;
     let has_root = doc.trailer.has(b"Root");
-    if has_root && (!validation.catalog_exists || !validation.page_tree_exists) {
+    if has_root && (!validation.catalog_exists || (initial_page_count > 0 && !validation.page_tree_exists)) {
         return Err(PdfParseError::CorruptedPdf(
             "PDF structural validation failed after sanitization".to_string(),
         ));
@@ -144,20 +144,12 @@ pub fn validate_pdf_structure(buffer: &[u8]) -> Result<PdfStructureReport, PdfPa
     };
 
     let page_count = doc.get_pages().len();
-    let page_tree_exists = page_count > 0 || catalog_exists;
+    let page_tree_exists = catalog_exists && page_count > 0;
 
-    // Check for dangling references in remaining dictionaries
+    // Check for dangling references in remaining objects
     let mut dangling_count = 0;
     for object in doc.objects.values() {
-        match object {
-            Object::Dictionary(dict) => {
-                dangling_count += count_dangling_in_dict(dict, &doc);
-            }
-            Object::Stream(stream) => {
-                dangling_count += count_dangling_in_dict(&stream.dict, &doc);
-            }
-            _ => {}
-        }
+        dangling_count += count_dangling_in_object(object, &doc);
     }
 
     Ok(PdfStructureReport {
@@ -169,26 +161,30 @@ pub fn validate_pdf_structure(buffer: &[u8]) -> Result<PdfStructureReport, PdfPa
     })
 }
 
-fn count_dangling_in_dict(dict: &lopdf::Dictionary, doc: &Document) -> usize {
+fn count_dangling_in_object(obj: &lopdf::Object, doc: &lopdf::Document) -> usize {
     let mut count = 0;
-    for (_key, value) in dict.iter() {
-        match value {
-            Object::Reference(id) => {
-                if !doc.objects.contains_key(id) {
-                    count += 1;
-                }
+    match obj {
+        lopdf::Object::Reference(id) => {
+            if !doc.objects.contains_key(id) {
+                count += 1;
             }
-            Object::Array(arr) => {
-                for item in arr {
-                    if let Object::Reference(id) = item {
-                        if !doc.objects.contains_key(id) {
-                            count += 1;
-                        }
-                    }
-                }
-            }
-            _ => {}
         }
+        lopdf::Object::Array(arr) => {
+            for item in arr {
+                count += count_dangling_in_object(item, doc);
+            }
+        }
+        lopdf::Object::Dictionary(dict) => {
+            for (_key, value) in dict.iter() {
+                count += count_dangling_in_object(value, doc);
+            }
+        }
+        lopdf::Object::Stream(stream) => {
+            for (_key, value) in stream.dict.iter() {
+                count += count_dangling_in_object(value, doc);
+            }
+        }
+        _ => {}
     }
     count
 }
@@ -258,6 +254,23 @@ fn clean_dictionary(
         };
         if should_remove {
             dict.remove(b"AA");
+        }
+    }
+
+    // Recurse into child inline dictionaries and arrays of dictionaries
+    for (_key, value) in dict.iter_mut() {
+        match value {
+            Object::Dictionary(child_dict) => {
+                clean_dictionary(child_dict, profile, objects_to_remove);
+            }
+            Object::Array(arr) => {
+                for item in arr.iter_mut() {
+                    if let Object::Dictionary(child_dict) = item {
+                        clean_dictionary(child_dict, profile, objects_to_remove);
+                    }
+                }
+            }
+            _ => {}
         }
     }
 }

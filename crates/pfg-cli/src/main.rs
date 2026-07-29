@@ -320,6 +320,26 @@ fn main() {
 
                 match clean_file(&path, &options) {
                     Ok(report) => {
+                        if in_place && options.output_dir.is_none() {
+                            let ext_str = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+                            let file_stem =
+                                path.file_stem().and_then(|s| s.to_str()).unwrap_or("file");
+                            let generated_name = if options.safe_name {
+                                format!("{}.{}", &report.cleaned_sha256[..12], ext_str)
+                            } else if ext_str.is_empty() {
+                                format!("{}.pfg", file_stem)
+                            } else {
+                                format!("{}.pfg.{}", file_stem, ext_str)
+                            };
+                            let parent = path.parent().unwrap_or_else(|| std::path::Path::new("."));
+                            let generated_path = parent.join(generated_name);
+                            if generated_path.exists() && generated_path != path {
+                                if let Err(e) = fs::rename(&generated_path, &path) {
+                                    eprintln!("Failed to perform in-place replacement: {}", e);
+                                    process::exit(2);
+                                }
+                            }
+                        }
                         println!("Privacy File Guard Clean Report");
                         println!("==============================");
                         println!("Original SHA256: {}", report.original_sha256);

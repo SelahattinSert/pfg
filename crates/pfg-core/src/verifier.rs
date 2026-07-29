@@ -28,6 +28,7 @@ pub fn verify_files_with_profile(
             include_values: true,
         },
     )?;
+    let original_bytes = fs::read(original_path)?;
     let cleaned_bytes = fs::read(cleaned_path)?;
 
     let policy = PolicyEngine::for_profile(profile);
@@ -41,15 +42,32 @@ pub fn verify_files_with_profile(
         "jpeg" | "png" | "webp" => {
             if pfg_format_image::detect_format(&cleaned_bytes).is_none() {
                 decode_passed = false;
+            } else if let (Ok(orig_img), Ok(clean_img)) = (
+                image::load_from_memory(&original_bytes),
+                image::load_from_memory(&cleaned_bytes),
+            ) {
+                use image::GenericImageView;
+                if orig_img.dimensions() != clean_img.dimensions() {
+                    decode_passed = false;
+                    warnings.push(format!(
+                        "Dimension mismatch: original {:?}, cleaned {:?}",
+                        orig_img.dimensions(),
+                        clean_img.dimensions()
+                    ));
+                }
             }
         }
         "pdf" if pfg_format_pdf::validate_pdf_structure(&cleaned_bytes).is_err() => {
             decode_passed = false;
         }
-        "docx" | "xlsx" | "pptx"
-            if zip::ZipArchive::new(std::io::Cursor::new(&cleaned_bytes)).is_err() =>
-        {
-            decode_passed = false;
+        "docx" | "xlsx" | "pptx" => {
+            if let Ok(mut archive) = zip::ZipArchive::new(std::io::Cursor::new(&cleaned_bytes)) {
+                if archive.by_name("[Content_Types].xml").is_err() {
+                    decode_passed = false;
+                }
+            } else {
+                decode_passed = false;
+            }
         }
         _ => {}
     }

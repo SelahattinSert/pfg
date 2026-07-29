@@ -62,7 +62,7 @@ export const VerificationBadge: React.FC<VerificationBadgeProps> = ({
           <div>
             <div className="flex items-center gap-2.5">
               <h2 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
-                {isVerified ? '✅ 100% Verified Clean' : '⚠️ Sanitization Completed'}
+                {isVerified ? 'Policy Checks Passed' : 'Sanitization Processed'}
               </h2>
               <span
                 className={`px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border ${
@@ -71,12 +71,12 @@ export const VerificationBadge: React.FC<VerificationBadgeProps> = ({
                     : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
                 }`}
               >
-                {isVerified ? 'VERIFIED SAFE' : 'PARTIAL CLEAN'}
+                {isVerified ? 'POLICY VERIFIED' : 'ATTENTION REQUIRED'}
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-1">
               {isVerified
-                ? `Zero-trust verification confirmed zero residual privacy risks in ${
+                ? `All selected-policy checks passed. Internal rescan and structural checks passed for ${
                     originalFileName || 'file'
                   }.`
                 : `${report.remaining_findings_count} findings remain after cleaning.`}
@@ -103,7 +103,7 @@ export const VerificationBadge: React.FC<VerificationBadgeProps> = ({
             <span className="text-2xl font-black text-amber-400 font-mono">
               {report.original_findings_count}
             </span>
-            <span className="text-xs text-slate-500">privacy risks detected</span>
+            <span className="text-xs text-slate-500">findings detected</span>
           </div>
         </div>
 
@@ -116,7 +116,7 @@ export const VerificationBadge: React.FC<VerificationBadgeProps> = ({
             <span className="text-2xl font-black text-emerald-400 font-mono">
               {report.remaining_findings_count}
             </span>
-            <span className="text-xs text-emerald-400/80 font-medium">remaining risks</span>
+            <span className="text-xs text-emerald-400/80 font-medium">remaining findings</span>
           </div>
         </div>
 
@@ -176,7 +176,7 @@ export const VerificationBadge: React.FC<VerificationBadgeProps> = ({
           </h3>
           <span className="text-[11px] text-slate-400 flex items-center gap-1 font-mono">
             <FileCheck2 className="w-3.5 h-3.5 text-emerald-400" />
-            Air-Gapped Local Verification
+            Local Verification
           </span>
         </div>
 
@@ -232,7 +232,7 @@ export const VerificationBadge: React.FC<VerificationBadgeProps> = ({
         </div>
 
         <p className="text-[11px] text-slate-400 italic text-center pt-1">
-          Note: Hash change confirms successful removal of metadata bytes, EXIF data, and PII attributes from the output file.
+          Note: Hash change indicates output file byte modification post-sanitization.
         </p>
       </div>
     </div>

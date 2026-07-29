@@ -210,7 +210,10 @@ pub fn clean_directory(
                         }
                         Some(rep)
                     }
-                    Err(_) => None,
+                    Err(e) => {
+                        eprintln!("Error cleaning {:?}: {:?}", file_path, e);
+                        None
+                    }
                 }
             })
             .collect::<Vec<VerificationReport>>()
