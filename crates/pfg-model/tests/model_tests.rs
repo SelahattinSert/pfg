@@ -22,7 +22,7 @@ fn test_finding_and_report_serialization() {
         tool_version: "0.1.0".to_string(),
         operation: "scan".to_string(),
         input: InputFileMetadata {
-            name: "sample.jpg".to_string(),
+            display_name: "sample.jpg".to_string(),
             size: 1024,
             sha256: "abc...".to_string(),
         },

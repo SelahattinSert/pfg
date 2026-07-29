@@ -212,7 +212,7 @@ pub fn clean_directory(path: &Path, options: &BatchCleanOptions) -> Result<Batch
     };
 
     let cleaned_files = file_reports.len();
-    let verified_clean_count = file_reports.iter().filter(|r| r.verified_clean).count();
+    let verified_clean_count = file_reports.iter().filter(|r| r.verified).count();
     let failed_files = target_files.len().saturating_sub(cleaned_files);
 
     Ok(BatchCleanReport {

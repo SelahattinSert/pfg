@@ -103,17 +103,17 @@ fn test_clean_office_file_pipeline() {
 
     let report = clean_file(&docx_path, &options).expect("clean_file for DOCX should succeed");
 
-    assert!(report.verified_clean);
+    assert!(report.verified);
     assert!(report.original_findings_count > 0);
-    assert_eq!(report.cleaned_findings_count, 0);
+    assert_eq!(report.remaining_findings_count, 0);
 
     let cleaned_file = temp_dir.join("document.pfg.docx");
     assert!(cleaned_file.exists(), "Cleaned DOCX file document.pfg.docx should exist");
 
     let v_report = verify_files(&docx_path, &cleaned_file).expect("verify_files should succeed for DOCX");
-    assert!(v_report.verified_clean);
+    assert!(v_report.verified);
     assert_eq!(v_report.original_findings_count, report.original_findings_count);
-    assert_eq!(v_report.cleaned_findings_count, 0);
+    assert_eq!(v_report.remaining_findings_count, 0);
 
     fs::remove_dir_all(&temp_dir).ok();
 }

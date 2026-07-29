@@ -47,7 +47,7 @@ fn test_cli_scan_json() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("Stdout should be valid JSON");
     assert_eq!(parsed["detected_format"], "jpeg");
-    assert_eq!(parsed["input"]["name"], "fixtures/images/sample.jpg");
+    assert_eq!(parsed["input"]["display_name"], "sample.jpg");
 }
 
 #[test]

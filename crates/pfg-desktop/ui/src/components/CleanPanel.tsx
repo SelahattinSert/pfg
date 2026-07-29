@@ -156,7 +156,7 @@ export const CleanPanel: React.FC<CleanPanelProps> = ({
         !(window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__
       ) {
         console.info('Performing browser-side sanitization on real file bytes...');
-        const fileName = fileObj?.name || report?.input.name || selectedFilePath.split('/').pop() || 'cleaned_file.jpg';
+        const fileName = fileObj?.name || report?.input.display_name || selectedFilePath.split('/').pop() || 'cleaned_file.jpg';
         
         // Compute target download file name
         const ext = fileName.split('.').pop()?.toLowerCase() || 'jpg';

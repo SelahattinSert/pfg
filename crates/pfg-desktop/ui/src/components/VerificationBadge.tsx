@@ -9,6 +9,7 @@ import {
   Award,
   AlertTriangle,
   FileCheck2,
+  ShieldCheck,
 } from 'lucide-react';
 
 export interface VerificationBadgeProps {
@@ -34,10 +35,10 @@ export const VerificationBadge: React.FC<VerificationBadgeProps> = ({
     }
   };
 
-  const isVerified = report.verified_clean;
+  const isVerified = report.verified;
   const removedCount = Math.max(
     0,
-    report.original_findings_count - report.cleaned_findings_count
+    report.original_findings_count - report.remaining_findings_count
   );
 
   return (
@@ -78,7 +79,7 @@ export const VerificationBadge: React.FC<VerificationBadgeProps> = ({
                 ? `Zero-trust verification confirmed zero residual privacy risks in ${
                     originalFileName || 'file'
                   }.`
-                : `${report.cleaned_findings_count} findings remain after cleaning.`}
+                : `${report.remaining_findings_count} findings remain after cleaning.`}
             </p>
           </div>
         </div>
@@ -113,7 +114,7 @@ export const VerificationBadge: React.FC<VerificationBadgeProps> = ({
           </span>
           <div className="flex items-baseline gap-2">
             <span className="text-2xl font-black text-emerald-400 font-mono">
-              {report.cleaned_findings_count}
+              {report.remaining_findings_count}
             </span>
             <span className="text-xs text-emerald-400/80 font-medium">remaining risks</span>
           </div>
@@ -134,6 +135,37 @@ export const VerificationBadge: React.FC<VerificationBadgeProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Verification Checks List */}
+      {report.checks && report.checks.length > 0 && (
+        <div className="space-y-3 pt-2 border-t border-slate-800">
+          <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            Verification Checks
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {report.checks.map((check, idx) => (
+              <div
+                key={idx}
+                className="flex items-center justify-between p-3 rounded-lg bg-slate-950/70 border border-slate-800"
+              >
+                <span className="text-xs font-medium text-slate-200">{check.name}</span>
+                <span
+                  className={`text-[11px] px-2 py-0.5 rounded font-bold uppercase ${
+                    check.status === 'Passed'
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      : check.status === 'Warning'
+                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                      : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                  }`}
+                >
+                  {check.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* SHA-256 Cryptographic Verification Section */}
       <div className="space-y-3 pt-2 border-t border-slate-800">

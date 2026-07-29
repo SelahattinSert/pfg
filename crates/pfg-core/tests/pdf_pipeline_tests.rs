@@ -58,17 +58,17 @@ fn test_clean_pdf_file_pipeline() {
 
     let report = clean_file(&pdf_path, &options).expect("clean_file for PDF should succeed");
 
-    assert!(report.verified_clean);
+    assert!(report.verified);
     assert!(report.original_findings_count > 0);
-    assert_eq!(report.cleaned_findings_count, 0);
+    assert_eq!(report.remaining_findings_count, 0);
 
     let cleaned_file = temp_dir.join("document.pfg.pdf");
     assert!(cleaned_file.exists(), "Cleaned PDF file document.pfg.pdf should exist");
 
     let v_report = verify_files(&pdf_path, &cleaned_file).expect("verify_files should succeed for PDF");
-    assert!(v_report.verified_clean);
+    assert!(v_report.verified);
     assert_eq!(v_report.original_findings_count, report.original_findings_count);
-    assert_eq!(v_report.cleaned_findings_count, 0);
+    assert_eq!(v_report.remaining_findings_count, 0);
 
     fs::remove_dir_all(&temp_dir).ok();
 }

@@ -60,18 +60,18 @@ fn test_clean_file_atomic_and_verification() {
     };
 
     let report = clean_file(&test_file, &options).expect("clean_file failed");
-    assert!(report.verified_clean);
+    assert!(report.verified);
     assert!(report.original_findings_count > 0);
-    assert_eq!(report.cleaned_findings_count, 0);
+    assert_eq!(report.remaining_findings_count, 0);
     assert_ne!(report.original_sha256, report.cleaned_sha256);
 
     let cleaned_file = temp_dir.join("photo.pfg.jpg");
     assert!(cleaned_file.exists());
 
     let v_report = verify_files(&test_file, &cleaned_file).expect("verify_files failed");
-    assert!(v_report.verified_clean);
+    assert!(v_report.verified);
     assert_eq!(v_report.original_findings_count, report.original_findings_count);
-    assert_eq!(v_report.cleaned_findings_count, 0);
+    assert_eq!(v_report.remaining_findings_count, 0);
 
     fs::remove_dir_all(&temp_dir).ok();
 }
@@ -118,7 +118,7 @@ fn test_clean_file_safe_name() {
     };
 
     let report = clean_file(&test_file, &options).unwrap();
-    assert!(report.verified_clean);
+    assert!(report.verified);
 
     let entries: Vec<_> = fs::read_dir(&temp_dir)
         .unwrap()

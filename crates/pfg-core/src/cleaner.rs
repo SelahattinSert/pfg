@@ -7,7 +7,7 @@ use pfg_policy::CleanProfile;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use crate::scanner::{scan_file, CoreError, ScanOptions};
+use crate::scanner::CoreError;
 use crate::verifier::VerificationReport;
 
 #[derive(Debug, Clone)]
@@ -52,7 +52,6 @@ pub fn clean_file(path: &Path, options: &CleanOptions) -> Result<VerificationRep
         return Err(CoreError::UnsupportedFormat);
     };
 
-    let original_scan = scan_file(path, &ScanOptions { include_values: true })?;
 
     let file_stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("file");
     let ext_str = path.extension().and_then(|e| e.to_str());
@@ -102,24 +101,19 @@ pub fn clean_file(path: &Path, options: &CleanOptions) -> Result<VerificationRep
     // Write to atomic temp file
     fs::write(&tmp_path, &sanitized_bytes)?;
 
-    // Rescan temporary output to verify clean status
-    let cleaned_scan = match scan_file(&tmp_path, &ScanOptions { include_values: true }) {
-        Ok(scan) => scan,
+    // Rescan temporary output to verify clean status using policy engine
+    let ver_report = match crate::verifier::verify_files_with_profile(path, &tmp_path, options.profile) {
+        Ok(report) => report,
         Err(e) => {
             let _ = fs::remove_file(&tmp_path);
             return Err(e);
         }
     };
 
-    let has_privacy_risks = cleaned_scan
-        .findings
-        .iter()
-        .any(|f| f.severity != pfg_model::Severity::Informational);
-
-    if has_privacy_risks {
+    if !ver_report.verified {
         let _ = fs::remove_file(&tmp_path);
         return Err(CoreError::ParseError(
-            "Post-clean verification failed: privacy findings still present".to_string(),
+            "Post-clean verification failed: required policy removals still present or decode error".to_string(),
         ));
     }
 
@@ -129,13 +123,6 @@ pub fn clean_file(path: &Path, options: &CleanOptions) -> Result<VerificationRep
         return Err(CoreError::IoError(e));
     }
 
-    Ok(VerificationReport {
-        original_sha256: original_scan.input.sha256,
-        cleaned_sha256: cleaned_scan.input.sha256,
-        original_findings_count: original_scan.findings.len(),
-        cleaned_findings_count: cleaned_scan.findings.len(),
-        verified_clean: true,
-        assurance_level: "Container Rebuilt".to_string(),
-    })
+    Ok(ver_report)
 }
 

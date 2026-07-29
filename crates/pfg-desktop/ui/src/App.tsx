@@ -588,7 +588,7 @@ export const App: React.FC = () => {
   );
 
   const handleInspectFileFromBatch = useCallback((fileReport: ScanReport) => {
-    const fullPath = fileReport.input.name;
+    const fullPath = fileReport.input.display_name;
     setSelectedFilePath(fullPath);
     setSelectedFileName(fullPath.split('/').pop() || fullPath);
     setSelectedFileSize(fileReport.input.size);
@@ -747,7 +747,7 @@ export const App: React.FC = () => {
                       </div>
                       <div>
                         <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                          <span>{report.input.name}</span>
+                          <span>{report.input.display_name}</span>
                           <span className="px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase">
                             {report.detected_format}
                           </span>
@@ -810,7 +810,7 @@ export const App: React.FC = () => {
                 {/* Section 4: CleanPanel Component */}
                 <section className="space-y-6">
                   <CleanPanel
-                    selectedFilePath={selectedFilePath || report.input.name}
+                    selectedFilePath={selectedFilePath || report.input.display_name}
                     fileObj={selectedFileObj}
                     report={report}
                     onCleanSuccess={(verReport) => setVerificationReport(verReport)}
@@ -820,7 +820,7 @@ export const App: React.FC = () => {
                   {verificationReport && (
                     <VerificationBadge
                       report={verificationReport}
-                      originalFileName={report.input.name}
+                      originalFileName={report.input.display_name}
                     />
                   )}
                 </section>

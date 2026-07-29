@@ -148,7 +148,7 @@ mod tests {
         let result = scan_file_cmd(file_path.to_str().unwrap().to_string(), true);
         assert!(result.is_ok());
         let report = result.unwrap();
-        assert_eq!(report.input.name, "test.jpg");
+        assert_eq!(report.input.display_name, "test.jpg");
 
         let _ = fs::remove_dir_all(temp_dir);
     }
@@ -185,7 +185,7 @@ mod tests {
         );
         assert!(result.is_ok());
         let report = result.unwrap();
-        assert!(report.verified_clean);
+        assert!(report.verified);
 
         let _ = fs::remove_dir_all(temp_dir);
     }

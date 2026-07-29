@@ -223,7 +223,7 @@ fn main() {
                             OutputFormat::Text => {
                                 println!("Privacy File Guard Scan Report");
                                 println!("==============================");
-                                println!("File: {}", scan_report.input.name);
+                                println!("File: {}", scan_report.input.display_name);
                                 println!("Format: {}", scan_report.detected_format);
                                 println!("Size: {} bytes", scan_report.input.size);
                                 println!("Findings: {}\n", scan_report.findings.len());
@@ -315,8 +315,8 @@ fn main() {
                         println!("Original SHA256: {}", report.original_sha256);
                         println!("Cleaned SHA256:  {}", report.cleaned_sha256);
                         println!("Original Findings: {}", report.original_findings_count);
-                        println!("Cleaned Findings:  {}", report.cleaned_findings_count);
-                        println!("Verified Clean: {}", report.verified_clean);
+                        println!("Remaining Findings: {}", report.remaining_findings_count);
+                        println!("Verified Clean: {}", report.verified);
                         println!("Assurance Level: {}", report.assurance_level);
                         process::exit(0);
                     }
@@ -335,11 +335,11 @@ fn main() {
                     println!("Original SHA256: {}", report.original_sha256);
                     println!("Cleaned SHA256:  {}", report.cleaned_sha256);
                     println!("Original Findings: {}", report.original_findings_count);
-                    println!("Cleaned Findings:  {}", report.cleaned_findings_count);
-                    println!("Verified Clean: {}", report.verified_clean);
+                    println!("Remaining Findings: {}", report.remaining_findings_count);
+                    println!("Verified Clean: {}", report.verified);
                     println!("Assurance Level: {}", report.assurance_level);
 
-                    if report.verified_clean {
+                    if report.verified {
                         process::exit(0);
                     } else {
                         process::exit(6);

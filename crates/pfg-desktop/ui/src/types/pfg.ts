@@ -52,7 +52,7 @@ export interface Finding {
 }
 
 export interface InputFileMetadata {
-  name: string;
+  display_name: string;
   size: number;
   sha256: string;
 }
@@ -76,13 +76,30 @@ export interface ScanReport {
   summary: FindingSummary;
 }
 
+export type AssuranceLevel =
+  | 'MetadataRemoved'
+  | 'StructurallyVerified'
+  | 'ContainerRebuilt'
+  | 'VerificationFailed';
+
+export type VerificationStatus = 'Passed' | 'Failed' | 'Warning';
+
+export interface VerificationCheck {
+  name: string;
+  status: VerificationStatus;
+  message?: string | null;
+}
+
 export interface VerificationReport {
   original_sha256: string;
   cleaned_sha256: string;
   original_findings_count: number;
-  cleaned_findings_count: number;
-  verified_clean: boolean;
-  assurance_level: string;
+  remaining_findings_count: number;
+  required_removals_remaining: number;
+  verified: boolean;
+  assurance_level: AssuranceLevel;
+  checks: VerificationCheck[];
+  warnings: string[];
 }
 
 export interface BatchScanOptions {

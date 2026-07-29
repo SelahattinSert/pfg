@@ -90,8 +90,9 @@ pub fn scan_file(path: &Path, options: &ScanOptions) -> Result<ScanReport, CoreE
         }
     }
 
-    let filename = path
-        .to_str()
+    let display_name = path
+        .file_name()
+        .and_then(|n| n.to_str())
         .unwrap_or("unknown")
         .to_string();
 
@@ -100,7 +101,7 @@ pub fn scan_file(path: &Path, options: &ScanOptions) -> Result<ScanReport, CoreE
         tool_version: env!("CARGO_PKG_VERSION").to_string(),
         operation: "scan".to_string(),
         input: InputFileMetadata {
-            name: filename,
+            display_name,
             size: buffer.len() as u64,
             sha256: hash_hex,
         },
