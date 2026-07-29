@@ -9,3 +9,4 @@ zip = { version = "0.6", default-features = false }
 thiserror = "1.0"
 pfg-model = { path = "../pfg-model" }
 pfg-policy = { path = "../pfg-policy" }
+quick-xml = "0.31"

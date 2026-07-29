@@ -1,6 +1,9 @@
 use std::io::{Cursor, Read, Write};
 use zip::write::FileOptions;
 use zip::{ZipArchive, ZipWriter};
+use quick_xml::events::Event;
+use quick_xml::reader::Reader;
+use quick_xml::writer::Writer;
 
 use pfg_policy::CleanProfile;
 
@@ -9,7 +12,7 @@ use crate::scanner::OfficeParseError;
 
 /// Sanitizes an Office Open XML document (DOCX, XLSX, PPTX) by redacting
 /// metadata in `docProps/core.xml` and `docProps/app.xml`, stripping custom properties,
-/// thumbnails, VBA macros, and stripping comments in `Strict` mode.
+/// thumbnails, VBA macros, stripping comments in `Strict` mode, and cleaning relationships.
 pub fn sanitize_office(
     buffer: &[u8],
     profile: CleanProfile,
@@ -29,6 +32,18 @@ pub fn sanitize_office(
         return Err(OfficeParseError::InvalidContainer);
     }
 
+    // Pass 1: Identify all stripped entry names
+    let mut stripped_parts = Vec::new();
+    for i in 0..archive.len() {
+        if let Ok(file) = archive.by_index(i) {
+            let name = file.name();
+            if should_strip_entry(name, profile) {
+                stripped_parts.push(name.to_string());
+            }
+        }
+    }
+
+    // Pass 2: Rebuild zip archive
     let mut output_buf = Vec::new();
     {
         let output_cursor = Cursor::new(&mut output_buf);
@@ -51,30 +66,24 @@ pub fn sanitize_office(
 
             let options = FileOptions::default().compression_method(file.compression());
 
-            if name == "docProps/core.xml" {
-                let redacted = redact_core_xml(&contents);
-                zip_out
-                    .start_file(name, options)
-                    .map_err(|err| OfficeParseError::CorruptedZip(err.to_string()))?;
-                zip_out
-                    .write_all(&redacted)
-                    .map_err(|err| OfficeParseError::CorruptedZip(err.to_string()))?;
+            let final_contents = if name == "docProps/core.xml" {
+                redact_core_xml(&contents)
             } else if name == "docProps/app.xml" {
-                let redacted = redact_app_xml(&contents);
-                zip_out
-                    .start_file(name, options)
-                    .map_err(|err| OfficeParseError::CorruptedZip(err.to_string()))?;
-                zip_out
-                    .write_all(&redacted)
-                    .map_err(|err| OfficeParseError::CorruptedZip(err.to_string()))?;
+                redact_app_xml(&contents)
+            } else if name == "[Content_Types].xml" {
+                clean_content_types_xml(&contents, &stripped_parts)
+            } else if name.ends_with(".rels") {
+                clean_rels_xml(&contents, &stripped_parts)
             } else {
-                zip_out
-                    .start_file(name, options)
-                    .map_err(|err| OfficeParseError::CorruptedZip(err.to_string()))?;
-                zip_out
-                    .write_all(&contents)
-                    .map_err(|err| OfficeParseError::CorruptedZip(err.to_string()))?;
-            }
+                contents
+            };
+
+            zip_out
+                .start_file(name, options)
+                .map_err(|err| OfficeParseError::CorruptedZip(err.to_string()))?;
+            zip_out
+                .write_all(&final_contents)
+                .map_err(|err| OfficeParseError::CorruptedZip(err.to_string()))?;
         }
 
         zip_out
@@ -113,6 +122,86 @@ fn should_strip_entry(name: &str, profile: CleanProfile) -> bool {
     }
 
     false
+}
+
+fn clean_content_types_xml(content: &[u8], stripped_parts: &[String]) -> Vec<u8> {
+    let mut reader = Reader::from_reader(content);
+    reader.trim_text(true);
+    let mut writer = Writer::new(Cursor::new(Vec::new()));
+    let mut buf = Vec::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+                let name = e.name();
+                if name.as_ref() == b"Override" {
+                    let mut should_skip = false;
+                    for attr in e.attributes().flatten() {
+                        if attr.key.as_ref() == b"PartName" {
+                            let val = String::from_utf8_lossy(&attr.value);
+                            let normalized_val = val.trim_start_matches('/');
+                            if stripped_parts.iter().any(|p| p == normalized_val || p.ends_with(normalized_val)) {
+                                should_skip = true;
+                                break;
+                            }
+                        }
+                    }
+                    if should_skip {
+                        continue;
+                    }
+                }
+                let _ = writer.write_event(Event::Empty(e));
+            }
+            Ok(Event::Eof) => break,
+            Ok(event) => {
+                let _ = writer.write_event(event);
+            }
+            Err(_) => return content.to_vec(),
+        }
+        buf.clear();
+    }
+
+    writer.into_inner().into_inner()
+}
+
+fn clean_rels_xml(content: &[u8], stripped_parts: &[String]) -> Vec<u8> {
+    let mut reader = Reader::from_reader(content);
+    reader.trim_text(true);
+    let mut writer = Writer::new(Cursor::new(Vec::new()));
+    let mut buf = Vec::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+                let name = e.name();
+                if name.as_ref() == b"Relationship" {
+                    let mut should_skip = false;
+                    for attr in e.attributes().flatten() {
+                        if attr.key.as_ref() == b"Target" {
+                            let val = String::from_utf8_lossy(&attr.value);
+                            let target_normalized = val.trim_start_matches('/');
+                            if stripped_parts.iter().any(|p| p.ends_with(target_normalized) || target_normalized.ends_with(p)) {
+                                should_skip = true;
+                                break;
+                            }
+                        }
+                    }
+                    if should_skip {
+                        continue;
+                    }
+                }
+                let _ = writer.write_event(Event::Empty(e));
+            }
+            Ok(Event::Eof) => break,
+            Ok(event) => {
+                let _ = writer.write_event(event);
+            }
+            Err(_) => return content.to_vec(),
+        }
+        buf.clear();
+    }
+
+    writer.into_inner().into_inner()
 }
 
 fn redact_core_xml(content: &[u8]) -> Vec<u8> {
