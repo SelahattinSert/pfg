@@ -85,7 +85,7 @@ export const BatchDashboard: React.FC<BatchDashboardProps> = ({
         (r) => r.original_sha256 === report.input.sha256
       );
       if (vReport) {
-        return vReport.verified_clean
+        return vReport.verified
           ? { label: 'Verified Clean', color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' }
           : { label: 'Clean Failed', color: 'bg-red-500/20 text-red-300 border-red-500/30' };
       }

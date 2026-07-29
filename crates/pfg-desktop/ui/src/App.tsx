@@ -462,7 +462,7 @@ export const App: React.FC = () => {
       schema_version: 1,
       tool_version: '0.1.0',
       operation: 'scan_file',
-      input: { name: fileName, size, sha256 },
+      input: { display_name: fileName, size, sha256 },
       detected_format: ext,
       support_level: 'FullSupport',
       findings,

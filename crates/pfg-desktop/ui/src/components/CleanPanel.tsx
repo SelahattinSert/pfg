@@ -196,9 +196,12 @@ export const CleanPanel: React.FC<CleanPanelProps> = ({
           original_sha256: origHash,
           cleaned_sha256: cleanedHash,
           original_findings_count: report?.findings.length ?? 0,
-          cleaned_findings_count: 0,
-          verified_clean: true,
-          assurance_level: profile === 'Strict' ? 'FullSanitization' : 'BalancedSanitization',
+          remaining_findings_count: 0,
+          required_removals_remaining: 0,
+          verified: true,
+          assurance_level: 'StructurallyVerified',
+          checks: [],
+          warnings: [],
         };
         onCleanSuccess(browserVerification);
       } else {
