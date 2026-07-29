@@ -185,16 +185,19 @@ pub fn clean_directory(path: &Path, options: &BatchCleanOptions) -> Result<Batch
                 match res {
                     Ok(rep) => {
                         if options.in_place && options.output_dir.is_none() {
-                            let output_name = if options.safe_name {
-                                format!("{}.{}", rep.cleaned_sha256.chars().take(12).collect::<String>(), file_path.extension().and_then(|e| e.to_str()).unwrap_or(""))
+                            let ext_str = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
+                            let file_stem = file_path.file_stem().and_then(|s| s.to_str()).unwrap_or("file");
+                            let generated_name = if options.safe_name {
+                                format!("{}.{}", &rep.cleaned_sha256[..12], ext_str)
+                            } else if ext_str.is_empty() {
+                                format!("{}.pfg", file_stem)
                             } else {
-                                let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
-                                let stem = file_path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-                                format!("{}.pfg.{}", stem, ext)
+                                format!("{}.pfg.{}", file_stem, ext_str)
                             };
-                            let generated_path = file_path.parent().unwrap_or(Path::new("")).join(output_name);
+                            let parent = file_path.parent().unwrap_or_else(|| Path::new("."));
+                            let generated_path = parent.join(generated_name);
                             if generated_path.exists() && generated_path != *file_path {
-                                fs::rename(&generated_path, file_path).ok();
+                                let _ = fs::rename(&generated_path, file_path);
                             }
                         }
                         Some(rep)

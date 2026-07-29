@@ -7,7 +7,7 @@ use std::process;
 use clap::{Parser, Subcommand, ValueEnum};
 use pfg_core::{
     clean_directory, clean_file, scan_directory, scan_file, verify_files, BatchCleanOptions,
-    BatchScanOptions, CleanOptions, CleanProfile, ScanOptions,
+    BatchScanOptions, CleanOptions, CleanProfile, CoreError, ScanOptions,
 };
 use pfg_model::Severity;
 
@@ -139,6 +139,21 @@ impl From<SeverityArg> for Severity {
     }
 }
 
+fn exit_code_for_error(err: &CoreError) -> i32 {
+    match err {
+        CoreError::IoError(e) => {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                2
+            } else {
+                2
+            }
+        }
+        CoreError::SymlinkDenied => 2,
+        CoreError::UnsupportedFormat => 3,
+        CoreError::ParseError(_) => 4,
+    }
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -166,14 +181,14 @@ fn main() {
                             Ok(json) => json,
                             Err(e) => {
                                 eprintln!("Failed to serialize batch report: {}", e);
-                                process::exit(3);
+                                process::exit(4);
                             }
                         };
 
                         if let Some(ref report_path) = report {
                             if let Err(e) = fs::write(report_path, &json_output) {
                                 eprintln!("Error writing report file: {}", e);
-                                process::exit(4);
+                                process::exit(2);
                             }
                         }
 
@@ -194,7 +209,7 @@ fn main() {
                     }
                     Err(e) => {
                         eprintln!("Batch scan error: {}", e);
-                        process::exit(3);
+                        process::exit(exit_code_for_error(&e));
                     }
                 }
             } else {
@@ -205,14 +220,14 @@ fn main() {
                             Ok(json) => json,
                             Err(e) => {
                                 eprintln!("Failed to serialize scan report: {}", e);
-                                process::exit(3);
+                                process::exit(4);
                             }
                         };
 
                         if let Some(ref report_path) = report {
                             if let Err(e) = fs::write(report_path, &json_output) {
                                 eprintln!("Error writing report file: {}", e);
-                                process::exit(4);
+                                process::exit(2);
                             }
                         }
 
@@ -260,7 +275,7 @@ fn main() {
                     }
                     Err(e) => {
                         eprintln!("Scan error: {}", e);
-                        process::exit(3);
+                        process::exit(exit_code_for_error(&e));
                     }
                 }
             }
@@ -297,7 +312,7 @@ fn main() {
                     }
                     Err(e) => {
                         eprintln!("Batch clean error: {}", e);
-                        process::exit(5);
+                        process::exit(exit_code_for_error(&e));
                     }
                 }
             } else {
@@ -322,7 +337,7 @@ fn main() {
                     }
                     Err(e) => {
                         eprintln!("Clean error: {}", e);
-                        process::exit(5);
+                        process::exit(exit_code_for_error(&e));
                     }
                 }
             }
@@ -347,7 +362,7 @@ fn main() {
                 }
                 Err(e) => {
                     eprintln!("Verification error: {}", e);
-                    process::exit(6);
+                    process::exit(exit_code_for_error(&e));
                 }
             }
         }
