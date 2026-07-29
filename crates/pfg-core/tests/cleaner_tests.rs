@@ -1,4 +1,4 @@
-use pfg_core::{clean_file, verify_files, CleanOptions, CoreError};
+use pfg_core::{clean_file, verify_files, CleanOptions};
 use pfg_policy::CleanProfile;
 use std::fs;
 
@@ -82,6 +82,7 @@ fn test_clean_file_atomic_and_verification() {
 fn test_clean_file_symlink_denied() {
     #[cfg(unix)]
     {
+        use pfg_core::CoreError;
         use std::os::unix::fs::symlink;
 
         let temp_dir = std::env::temp_dir().join("pfg_clean_tests_symlink");
