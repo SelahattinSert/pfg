@@ -1,7 +1,6 @@
 use pfg_core::{clean_file, verify_files, CleanOptions, CoreError};
 use pfg_policy::CleanProfile;
 use std::fs;
-use std::os::unix::fs::symlink;
 
 fn create_test_jpeg() -> Vec<u8> {
     let mut jpeg = vec![0xFF, 0xD8]; // SOI
@@ -81,27 +80,32 @@ fn test_clean_file_atomic_and_verification() {
 
 #[test]
 fn test_clean_file_symlink_denied() {
-    let temp_dir = std::env::temp_dir().join("pfg_clean_tests_symlink");
-    let _ = fs::remove_dir_all(&temp_dir);
-    fs::create_dir_all(&temp_dir).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::symlink;
 
-    let target_file = temp_dir.join("target.jpg");
-    fs::write(&target_file, b"dummy").unwrap();
+        let temp_dir = std::env::temp_dir().join("pfg_clean_tests_symlink");
+        let _ = fs::remove_dir_all(&temp_dir);
+        fs::create_dir_all(&temp_dir).unwrap();
 
-    let symlink_file = temp_dir.join("symlink.jpg");
-    symlink(&target_file, &symlink_file).unwrap();
+        let target_file = temp_dir.join("target.jpg");
+        fs::write(&target_file, b"dummy").unwrap();
 
-    let options = CleanOptions {
-        profile: CleanProfile::Balanced,
-        output_dir: None,
-        safe_name: false,
-        overwrite: false,
-    };
+        let symlink_file = temp_dir.join("symlink.jpg");
+        symlink(&target_file, &symlink_file).unwrap();
 
-    let result = clean_file(&symlink_file, &options);
-    assert!(matches!(result, Err(CoreError::SymlinkDenied)));
+        let options = CleanOptions {
+            profile: CleanProfile::Balanced,
+            output_dir: None,
+            safe_name: false,
+            overwrite: false,
+        };
 
-    fs::remove_dir_all(&temp_dir).ok();
+        let result = clean_file(&symlink_file, &options);
+        assert!(matches!(result, Err(CoreError::SymlinkDenied)));
+
+        fs::remove_dir_all(&temp_dir).ok();
+    }
 }
 
 #[test]
