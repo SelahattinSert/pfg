@@ -33,6 +33,10 @@ pub fn sanitize_pdf(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, Pdf
         }
     })?;
 
+    if doc.objects.len() > 500_000 {
+        return Err(PdfParseError::CorruptedPdf("PDF object count exceeds resource limit (max 500,000)".to_string()));
+    }
+
     let initial_page_count = doc.get_pages().len();
 
     // 1. Identify objects to remove (specifically streams/dicts of metadata, JavaScript, embedded files, or annots in strict mode)

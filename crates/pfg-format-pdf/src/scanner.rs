@@ -37,6 +37,10 @@ pub fn scan_pdf_metadata(
         }
     })?;
 
+    if doc.objects.len() > 500_000 {
+        return Err(PdfParseError::CorruptedPdf("PDF object count exceeds resource limit (max 500,000)".to_string()));
+    }
+
     let mut findings = Vec::new();
 
     // 1. Trailer checks

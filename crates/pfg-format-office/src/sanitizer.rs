@@ -27,6 +27,20 @@ pub fn sanitize_office(
     let mut archive = ZipArchive::new(cursor)
         .map_err(|err| OfficeParseError::CorruptedZip(err.to_string()))?;
 
+    if archive.len() > 10_000 {
+        return Err(OfficeParseError::CorruptedZip("Zip bomb limit exceeded: too many entries".to_string()));
+    }
+
+    let mut total_uncompressed: u64 = 0;
+    for i in 0..archive.len() {
+        if let Ok(file) = archive.by_index(i) {
+            total_uncompressed += file.size();
+            if total_uncompressed > 500 * 1024 * 1024 {
+                return Err(OfficeParseError::CorruptedZip("Zip bomb limit exceeded: total uncompressed size exceeds 500 MB".to_string()));
+            }
+        }
+    }
+
     // 3. Detect format
     if detect_office_format(buffer).is_none() {
         return Err(OfficeParseError::InvalidContainer);
