@@ -7,31 +7,42 @@
 [![License](https://img.shields.io/badge/License-MPL--2.0-brightgreen.svg)](LICENSE)
 [![Security](https://img.shields.io/badge/Unsafe-Forbidden-success.svg)](crates/pfg-core/src/lib.rs)
 
-> **Privacy File Guard is a 100% local, zero-cloud metadata audit and sanitization tool that prevents privacy leaks by scanning and removing hidden location data, device identifiers, and security risks from images, PDFs, and Office documents.**
+> **Privacy File Guard is a local, zero-cloud metadata audit and sanitization tool designed to detect and scrub hidden location data, device serial numbers, author attributes, and embedded metadata from images, PDFs, and Office Open XML documents.**
 
 ---
 
 ## Executive Summary & Architecture
 
-Privacy File Guard addresses the risk of accidental exposure of confidential metadata when sharing or publishing documents and images. It features a multi-crate modular Rust architecture, zero-cloud execution, and safe multithreaded directory processing.
+Privacy File Guard helps prevent accidental privacy exposure when sharing or publishing documents and images. Built with a modular Rust workspace architecture (`#![forbid(unsafe_code)]`), PFG processes files entirely on your local device without external network connections.
 
-### Key Capabilities
+### Format Support Matrix
 
-- **100% Offline Local Engine**: Zero network connectivity required. Files are processed entirely in memory and local storage.
-- **Lossless Image Sanitization (JPEG, PNG, WebP)**: Purges EXIF, GPS coordinates, camera serial numbers, and XMP streams while retaining pristine image quality (High Quality 92% JPEG encoding) and original file size (~2.3 MB).
-- **Physical Auto-Orientation Matrix**: Automatically rotates pixel arrays (`2062 x 3664`) to prevent portrait photos (e.g., iPhone 13 images) from rendering sideways or inverted across Linux, Windows, macOS, Android, and iOS image viewers.
-- **PDF Security Redaction**: Cleans XMP metadata streams, Document Info dictionaries, embedded files, and potentially malicious JavaScript actions.
-- **Office Document Sanitization (.docx, .xlsx, .pptx)**: Redacts author metadata (`docProps/core.xml`), custom properties, hidden comments, and macro (`.bin`) binaries.
-- **Parallel Multi-Core Batch Processing**: Utilizes Rust `rayon` concurrency to audit and sanitize thousands of files across all available CPU threads.
-- **Post-Clean Verification Check**: Automatically re-audits every output file post-sanitization to ensure zero residual privacy findings before committing writes to disk.
+| Format Category | Formats | Metadata Scanned & Cleaned |
+| :--- | :--- | :--- |
+| **Raster Images** | `.jpg`, `.jpeg`, `.png`, `.webp` | EXIF, GPS, camera model, lens serials, XMP streams, PNG `tEXt`/`iTXt`/`zTXt` chunks, WebP EXIF/XMP chunks. |
+| **PDF Documents** | `.pdf` | `/Info` dictionary (Author, Creator, Producer, Title), `/Metadata` XMP streams, `/OpenAction` JavaScript, `/Annots` (in Strict mode). Preserves Catalog & Page tree. |
+| **Office Documents** | `.docx`, `.xlsx`, `.pptx` | `docProps/core.xml` (Author, LastModifiedBy, Dates), `docProps/app.xml` (Company, Manager), custom properties, thumbnails, VBA macros (`vbaProject.bin`), and comments. |
 
 ---
 
-## Prerequisites & Installation
+## Profiles & Privacy Guarantees
 
-### 1. Prerequisites
+### Sanitization Profiles
 
-Privacy File Guard requires **Rust** (`rustup`) and **Node.js**. Install the required OS system dependencies:
+- **Balanced Profile (Default)**: Purges PII, location data, camera serial numbers, author identity, comments, and high-risk metadata properties while preserving essential rendering attributes such as color profiles (`iCCP`) and physical dimensions (`pHYs`).
+- **Strict Profile**: Strips all non-essential metadata properties, custom attributes, comments, thumbnails, and annotations for maximum privacy reduction.
+
+### Realistic Assurance Guarantees
+
+Privacy File Guard performs local metadata scrubbing and post-clean verification checks on supported file formats. It does not provide absolute guarantees regarding human-readable text content within documents, hidden steganography, or unrecognized proprietary stream formats.
+
+---
+
+## Prerequisites & Building
+
+### Prerequisites
+
+Privacy File Guard requires **Rust** (`rustup`) and **Node.js**.
 
 #### Fedora / RHEL Linux:
 ```bash
@@ -45,20 +56,18 @@ sudo apt-get install -y libwebkit2gtk-4.1-dev libsoup-3.0-dev libgtk-3-dev libay
 ```
 
 #### Windows / macOS:
-No additional system libraries required. Standard Rust toolchain is sufficient.
+Standard Rust toolchain (`cargo`).
 
 ---
 
-### 2. Building the Project
-
-Clone the repository and compile the workspace:
+### Building & Testing
 
 ```bash
-git clone https://github.com/user/privacy-file-guard.git
-cd privacy-file-guard/privacy-file-guard-source
+git clone https://github.com/SelahattinSert/pfg.git
+cd pfg/privacy-file-guard-source
 
 # Execute full workspace unit & integration test suite
-cargo test --workspace --exclude pfg-desktop
+cargo test --workspace
 ```
 
 ---
@@ -67,64 +76,48 @@ cargo test --workspace --exclude pfg-desktop
 
 ### 1. Desktop Graphical User Interface (GUI)
 
-To launch the cross-platform native desktop application:
+Launch the desktop application:
 
 ```bash
 cargo run -p pfg-desktop
 ```
 
-#### Single File Inspection & Sanitization
-1. **File Selection**: Drag and drop a file onto the drop zone or click **Browse File** to open native system file dialogs (`rfd`).
-2. **Privacy Audit**: Review findings grouped by severity (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, `INFORMATIONAL`).
-3. **Value Inspection**: Use the **Mask Raw Values** toggle to inspect exact unmasked strings.
-4. **Sanitization**: Select your profile (`Balanced` or `Strict`) and click **Clean File**. PFG writes `filename.pfg.ext` and confirms with a **100% Verified Clean** status badge.
-
-#### Batch Directory Mode
-1. Switch to the **Batch Directory** tab in the main view.
-2. Click **Browse Folder** to select a target directory.
-3. Configure batch options:
-   - **Recursive**: Traverses all subdirectories.
-   - **Jobs**: Sets worker thread pool size (e.g., 8 threads).
-   - **In-Place**: Replaces original files in-place atomically.
-4. Click **Clean All Files** to process the directory.
+- **Single File Mode**: Drag and drop any supported image or document to inspect findings, toggle raw unmasked values, and execute profile-based sanitization.
+- **Batch Directory Mode**: Select a folder to run parallel multi-core auditing and in-place transactional cleaning.
 
 ---
 
 ### 2. Command Line Interface (CLI)
 
-For terminal automation and scripting, use `pfg-cli`.
-
-#### Audit a Single File
 ```bash
+# Scan a single file
 cargo run -p pfg-cli -- scan /path/to/document.pdf
-```
 
-#### Sanitize a Single File
-```bash
-cargo run -p pfg-cli -- clean /path/to/image.jpg
-```
-*Outputs `image.pfg.jpg` after post-clean verification.*
+# Clean a file with Balanced profile (outputs document.pfg.pdf)
+cargo run -p pfg-cli -- clean /path/to/document.pdf
 
-Specify custom output directories or profiles:
-```bash
-cargo run -p pfg-cli -- clean /path/to/image.jpg --output-dir /path/to/output --profile strict
-```
+# Clean a file with Strict profile to a custom output directory
+cargo run -p pfg-cli -- clean /path/to/image.jpg --profile strict --output-dir /path/to/output
 
-#### Verify Clean Status
-```bash
+# Verify clean status between original and cleaned file
 cargo run -p pfg-cli -- verify /path/to/original.jpg /path/to/image.pfg.jpg
-```
 
-#### Batch Directory Audit & Sanitization
-Audit an entire folder recursively using 8 CPU cores:
-```bash
+# Multithreaded batch directory scan
 cargo run -p pfg-cli -- scan /path/to/folder -r -j 8
-```
 
-Sanitize an entire folder in-place:
-```bash
+# Multithreaded batch in-place cleaning
 cargo run -p pfg-cli -- clean /path/to/folder -r --in-place
 ```
+
+### CLI Exit Codes
+
+- `0`: Operation succeeded cleanly / verification passed.
+- `1`: Threshold met or exceeded (when using `--fail-on`).
+- `2`: Target file or directory not found / IO error.
+- `3`: Unsupported file format.
+- `4`: Target file corrupted or unparseable.
+- `5`: Clean operation failed.
+- `6`: Verification failed.
 
 ---
 
@@ -133,16 +126,16 @@ cargo run -p pfg-cli -- clean /path/to/folder -r --in-place
 ```text
 privacy-file-guard-source/
 ├── docs/
-│   └── privacy_file_guard_banner.jpg  # Visual architecture banner
+│   └── privacy_file_guard_banner.jpg
 ├── crates/
-│   ├── pfg-model/           # Core domain models & finding definitions
-│   ├── pfg-policy/          # Compliance profiles (Balanced/Strict) & policy rules
-│   ├── pfg-format-image/    # JPEG, PNG, WebP parsers & auto-orientation engine
-│   ├── pfg-format-pdf/      # PDF XMP, JavaScript, and annotation redactors
+│   ├── pfg-model/           # Privacy-safe domain models & finding structures
+│   ├── pfg-policy/          # Profile policy engine & severity categorization
+│   ├── pfg-format-image/    # JPEG, PNG, WebP parsers & EXIF orientation engine
+│   ├── pfg-format-pdf/      # PDF redactors & structural validators
 │   ├── pfg-format-office/   # DOCX, XLSX, PPTX OOXML ZIP sanitizers
-│   ├── pfg-core/            # Rayon multithreaded batch pipeline & verifier
+│   ├── pfg-core/            # Rayon parallel batch engine & policy verifier
 │   ├── pfg-cli/             # Command Line Interface (CLI) application
-│   └── pfg-desktop/         # Tauri 2 + React native desktop GUI application
+│   └── pfg-desktop/         # Tauri 2 + React desktop GUI application
 └── Cargo.toml
 ```
 
@@ -150,5 +143,5 @@ privacy-file-guard-source/
 
 ## Security Policy & License
 
-- **Safety Guarantee**: Every crate in this workspace enforces `#![forbid(unsafe_code)]` at top-level crate roots, eliminating memory safety vulnerabilities.
+- **Safety**: Every crate in this workspace enforces `#![forbid(unsafe_code)]` at top-level crate roots.
 - **License**: Distributed under the [Mozilla Public License 2.0 (MPL-2.0)](LICENSE).
