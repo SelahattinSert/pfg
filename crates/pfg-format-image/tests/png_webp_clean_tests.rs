@@ -26,7 +26,7 @@ fn test_sanitize_png_removes_metadata_chunks_and_recalculates_crc() {
     png.extend_from_slice(&build_png_chunk(b"IDAT", b"Compressed image data"));
     png.extend_from_slice(&build_png_chunk(b"IEND", b""));
 
-    let cleaned = sanitize_png(&png).unwrap();
+    let cleaned = sanitize_png(&png, CleanProfile::Balanced).unwrap();
 
     assert_eq!(detect_format(&cleaned), Some(ImageFormat::Png));
     assert!(!cleaned.windows(4).any(|w| w == b"tEXt"));
@@ -65,7 +65,7 @@ fn test_sanitize_png_removes_metadata_chunks_and_recalculates_crc() {
 #[test]
 fn test_sanitize_png_invalid_header() {
     let invalid_buffer = b"NOT_A_PNG_HEADER";
-    let res = sanitize_png(invalid_buffer);
+    let res = sanitize_png(invalid_buffer, CleanProfile::Balanced);
     assert_eq!(res.err(), Some(ImageParseError::InvalidSoi));
 }
 
@@ -110,7 +110,7 @@ fn test_sanitize_webp_removes_exif_xmp_and_updates_header() {
     let riff_size = (webp.len() - 8) as u32;
     webp[4..8].copy_from_slice(&riff_size.to_le_bytes());
 
-    let cleaned = sanitize_webp(&webp).unwrap();
+    let cleaned = sanitize_webp(&webp, CleanProfile::Balanced).unwrap();
 
     assert_eq!(detect_format(&cleaned), Some(ImageFormat::WebP));
     assert!(!cleaned.windows(4).any(|w| w == b"EXIF"));

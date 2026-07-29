@@ -26,7 +26,7 @@ pub fn sanitize_image(
 ) -> Result<Vec<u8>, ImageParseError> {
     match format {
         ImageFormat::Jpeg => sanitize_jpeg(buffer, profile),
-        ImageFormat::Png => sanitize_png(buffer),
-        ImageFormat::WebP => sanitize_webp(buffer),
+        ImageFormat::Png => sanitize_png(buffer, profile),
+        ImageFormat::WebP => sanitize_webp(buffer, profile),
     }
 }

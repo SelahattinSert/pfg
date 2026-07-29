@@ -1,6 +1,7 @@
+use pfg_policy::CleanProfile;
 use crate::jpeg::ImageParseError;
 
-pub fn sanitize_webp(buffer: &[u8]) -> Result<Vec<u8>, ImageParseError> {
+pub fn sanitize_webp(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, ImageParseError> {
     if buffer.len() < 12 || &buffer[0..4] != b"RIFF" || &buffer[8..12] != b"WEBP" {
         return Err(ImageParseError::InvalidSoi);
     }
@@ -29,7 +30,12 @@ pub fn sanitize_webp(buffer: &[u8]) -> Result<Vec<u8>, ImageParseError> {
             return Err(ImageParseError::UnexpectedEof);
         }
 
-        if chunk_type != b"EXIF" && chunk_type != b"XMP " {
+        let is_removable = match profile {
+            CleanProfile::Balanced => chunk_type == b"EXIF" || chunk_type == b"XMP ",
+            CleanProfile::Strict => chunk_type == b"EXIF" || chunk_type == b"XMP " || chunk_type == b"ICCP",
+        };
+
+        if !is_removable {
             if chunk_type == b"VP8X" && length >= 1 {
                 // Copy 8-byte chunk header
                 output.extend_from_slice(&buffer[cursor..cursor + 8]);
@@ -37,7 +43,11 @@ pub fn sanitize_webp(buffer: &[u8]) -> Result<Vec<u8>, ImageParseError> {
                 // Copy payload
                 output.extend_from_slice(&buffer[cursor + 8..cursor + 8 + length]);
                 // Clear EXIF (bit 3 - 0x08) and XMP (bit 2 - 0x04) flags in VP8X
-                output[payload_start] &= !(0x08 | 0x04);
+                let mut clear_mask = 0x08 | 0x04;
+                if profile == CleanProfile::Strict {
+                    clear_mask |= 0x20; // Clear ICCP bit in VP8X in strict mode
+                }
+                output[payload_start] &= !clear_mask;
 
                 if length % 2 != 0 {
                     output.push(0);

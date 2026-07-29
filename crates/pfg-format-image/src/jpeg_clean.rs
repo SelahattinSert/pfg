@@ -52,8 +52,8 @@ pub fn sanitize_jpeg(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, Im
                     3 => dynamic_img.rotate180(),
                     4 => dynamic_img.flipv(),
                     5 => dynamic_img.rotate90().fliph(),
-                    6 => dynamic_img.rotate90().fliph(),
-                    7 => dynamic_img.rotate90().fliph(),
+                    6 => dynamic_img.rotate90(),
+                    7 => dynamic_img.rotate270().fliph(),
                     8 => dynamic_img.rotate270(),
                     _ => dynamic_img,
                 };

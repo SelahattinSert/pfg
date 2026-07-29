@@ -1,7 +1,8 @@
 use crc32fast::Hasher;
+use pfg_policy::CleanProfile;
 use crate::jpeg::ImageParseError;
 
-pub fn sanitize_png(buffer: &[u8]) -> Result<Vec<u8>, ImageParseError> {
+pub fn sanitize_png(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, ImageParseError> {
     if buffer.len() < 8 || &buffer[0..8] != b"\x89PNG\r\n\x1a\n" {
         return Err(ImageParseError::InvalidSoi);
     }
@@ -25,10 +26,16 @@ pub fn sanitize_png(buffer: &[u8]) -> Result<Vec<u8>, ImageParseError> {
             return Err(ImageParseError::UnexpectedEof);
         }
 
-        let is_removable = matches!(
-            chunk_type,
-            b"eXIf" | b"tEXt" | b"zTXt" | b"iTXt" | b"tIME" | b"iCCP" | b"pHYs" | b"sPLT"
-        );
+        let is_removable = match profile {
+            CleanProfile::Balanced => matches!(
+                chunk_type,
+                b"eXIf" | b"tEXt" | b"zTXt" | b"iTXt" | b"tIME" | b"dSIG" | b"gIFg" | b"gIFx"
+            ),
+            CleanProfile::Strict => matches!(
+                chunk_type,
+                b"eXIf" | b"tEXt" | b"zTXt" | b"iTXt" | b"tIME" | b"iCCP" | b"pHYs" | b"sPLT" | b"gAMA" | b"cHRM" | b"sRGB" | b"dSIG" | b"gIFg" | b"gIFx"
+            ),
+        };
 
         if !is_removable {
             // Copy 4-byte length

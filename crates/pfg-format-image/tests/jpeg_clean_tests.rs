@@ -125,3 +125,24 @@ fn test_jpeg_sanitization_unexpected_eof() {
     let err = sanitize_jpeg(&truncated, CleanProfile::Balanced).unwrap_err();
     assert_eq!(err, ImageParseError::UnexpectedEof);
 }
+
+#[test]
+fn test_jpeg_exif_orientation_extraction() {
+    // Little-endian TIFF header with IFD0 containing Tag 0x0112 (Orientation) set to 6
+    let mut exif_payload = Vec::new();
+    exif_payload.extend_from_slice(b"Exif\0\0");
+    exif_payload.extend_from_slice(b"II"); // Little-endian
+    exif_payload.extend_from_slice(&42u16.to_le_bytes()); // Magic 42
+    exif_payload.extend_from_slice(&8u32.to_le_bytes()); // IFD0 offset 8
+    exif_payload.extend_from_slice(&1u16.to_le_bytes()); // 1 entry
+
+    // Tag 0x0112, type 3 (SHORT), count 1, value 6
+    exif_payload.extend_from_slice(&0x0112u16.to_le_bytes());
+    exif_payload.extend_from_slice(&3u16.to_le_bytes());
+    exif_payload.extend_from_slice(&1u32.to_le_bytes());
+    exif_payload.extend_from_slice(&6u16.to_le_bytes());
+    exif_payload.extend_from_slice(&[0, 0]); // Pad value field to 4 bytes
+
+    let extracted = pfg_format_image::exif::extract_orientation(&exif_payload[6..]);
+    assert_eq!(extracted, Some(6));
+}
