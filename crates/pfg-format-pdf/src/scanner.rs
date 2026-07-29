@@ -38,7 +38,9 @@ pub fn scan_pdf_metadata(
     })?;
 
     if doc.objects.len() > 500_000 {
-        return Err(PdfParseError::CorruptedPdf("PDF object count exceeds resource limit (max 500,000)".to_string()));
+        return Err(PdfParseError::CorruptedPdf(
+            "PDF object count exceeds resource limit (max 500,000)".to_string(),
+        ));
     }
 
     let mut findings = Vec::new();
@@ -203,8 +205,7 @@ fn inspect_dictionary(
                 object_number: obj_num,
             },
             risk_explanation:
-                "PDF object contains executable JavaScript code posing security risks."
-                    .to_string(),
+                "PDF object contains executable JavaScript code posing security risks.".to_string(),
             removable: true,
         });
     }
@@ -212,7 +213,9 @@ fn inspect_dictionary(
     // Check for Embedded Files (/Type /Filespec or /EF or /EmbeddedFiles)
     let is_filespec = dict
         .get(b"Type")
-        .map(|v| v.as_name_str().ok() == Some("Filespec") || v.as_name_str().ok() == Some("EmbeddedFile"))
+        .map(|v| {
+            v.as_name_str().ok() == Some("Filespec") || v.as_name_str().ok() == Some("EmbeddedFile")
+        })
         .unwrap_or(false);
     let has_ef = dict.get(b"EF").is_ok() || dict.get(b"EmbeddedFiles").is_ok();
 

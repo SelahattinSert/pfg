@@ -84,7 +84,8 @@ fn test_sanitize_office_redacts_metadata_and_strips_files() {
         .expect("Sanitization in Balanced mode should succeed");
 
     // Scan sanitized file
-    let post_findings = scan_office_metadata(&sanitized_bytes, &policy).expect("Scan should succeed");
+    let post_findings =
+        scan_office_metadata(&sanitized_bytes, &policy).expect("Scan should succeed");
 
     // Core and app metadata should be redacted
     assert!(post_findings.iter().all(|f| f.key != "dc:creator"));
@@ -102,7 +103,9 @@ fn test_sanitize_office_redacts_metadata_and_strips_files() {
 
     // Stripped entries must not be present
     assert!(post_findings.iter().all(|f| f.key != "docProps/custom.xml"));
-    assert!(post_findings.iter().all(|f| f.key != "docProps/thumbnail.jpeg"));
+    assert!(post_findings
+        .iter()
+        .all(|f| f.key != "docProps/thumbnail.jpeg"));
     assert!(post_findings.iter().all(|f| f.key != "word/vbaProject.bin"));
 
     // Comments should remain in Balanced profile
@@ -127,7 +130,8 @@ fn test_sanitize_office_strict_strips_comments() {
     let sanitized_bytes = sanitize_office(&zip_data, CleanProfile::Strict)
         .expect("Sanitization in Strict mode should succeed");
 
-    let post_findings = scan_office_metadata(&sanitized_bytes, &policy).expect("Scan should succeed");
+    let post_findings =
+        scan_office_metadata(&sanitized_bytes, &policy).expect("Scan should succeed");
 
     // All comment files must be stripped in Strict mode
     assert!(post_findings.is_empty());

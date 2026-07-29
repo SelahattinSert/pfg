@@ -1,5 +1,5 @@
+use pfg_core::{BatchCleanOptions, BatchScanOptions};
 use std::path::PathBuf;
-use pfg_core::{BatchScanOptions, BatchCleanOptions};
 
 #[test]
 fn test_batch_options_instantiation() {

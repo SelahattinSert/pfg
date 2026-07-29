@@ -87,7 +87,7 @@ fn test_sanitize_webp_removes_exif_xmp_and_updates_header() {
     webp.extend_from_slice(b"EXIF");
     webp.extend_from_slice(&(exif_data.len() as u32).to_le_bytes());
     webp.extend_from_slice(exif_data);
-    if exif_data.len() % 2 != 0 {
+    if exif_data.len() % 2 == 1 {
         webp.push(0); // padding
     }
 
@@ -96,7 +96,7 @@ fn test_sanitize_webp_removes_exif_xmp_and_updates_header() {
     webp.extend_from_slice(b"XMP ");
     webp.extend_from_slice(&(xmp_data.len() as u32).to_le_bytes());
     webp.extend_from_slice(xmp_data);
-    if xmp_data.len() % 2 != 0 {
+    if xmp_data.len() % 2 == 1 {
         webp.push(0); // padding
     }
 

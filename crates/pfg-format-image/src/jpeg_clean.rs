@@ -46,7 +46,9 @@ pub fn sanitize_jpeg(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, Im
     // and encode with High Quality (92%) to preserve original ~2.3 MB file size and guarantee 100% upright display.
     if let Some(orient) = detected_orientation {
         if orient > 1 && orient <= 8 {
-            if let Ok(mut dynamic_img) = image::load_from_memory_with_format(buffer, image::ImageFormat::Jpeg) {
+            if let Ok(mut dynamic_img) =
+                image::load_from_memory_with_format(buffer, image::ImageFormat::Jpeg)
+            {
                 dynamic_img = match orient {
                     2 => dynamic_img.fliph(),
                     3 => dynamic_img.rotate180(),
@@ -59,7 +61,8 @@ pub fn sanitize_jpeg(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, Im
                 };
 
                 let mut out_bytes = Vec::new();
-                let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out_bytes, 92);
+                let mut encoder =
+                    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out_bytes, 92);
                 if encoder.encode_image(&dynamic_img).is_ok() {
                     return strip_jpeg_metadata(&out_bytes, profile);
                 }
@@ -156,6 +159,3 @@ fn strip_jpeg_metadata(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, 
 
     Ok(output)
 }
-
-
-

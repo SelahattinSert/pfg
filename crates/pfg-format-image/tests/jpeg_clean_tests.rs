@@ -1,7 +1,12 @@
-use pfg_format_image::{scan_jpeg_metadata, ImageParseError, sanitize_jpeg};
+use pfg_format_image::{sanitize_jpeg, scan_jpeg_metadata, ImageParseError};
 use pfg_policy::{CleanProfile, PolicyEngine};
 
-fn create_test_jpeg(include_com: bool, include_app1: bool, include_app2: bool, include_app13: bool) -> Vec<u8> {
+fn create_test_jpeg(
+    include_com: bool,
+    include_app1: bool,
+    include_app2: bool,
+    include_app13: bool,
+) -> Vec<u8> {
     let mut jpeg = vec![0xFF, 0xD8]; // SOI
 
     // APP0 (JFIF)
@@ -71,7 +76,11 @@ fn test_jpeg_sanitization_removes_com_and_app1() {
     let policy = PolicyEngine::balanced();
     let findings = scan_jpeg_metadata(&cleaned, &policy).expect("Scan failed");
 
-    assert!(findings.is_empty(), "Expected 0 findings after sanitization, found {}", findings.len());
+    assert!(
+        findings.is_empty(),
+        "Expected 0 findings after sanitization, found {}",
+        findings.len()
+    );
 
     // In Balanced mode:
     // APP0 (0xFFE0) should be present

@@ -1,5 +1,5 @@
-use pfg_policy::CleanProfile;
 use crate::jpeg::ImageParseError;
+use pfg_policy::CleanProfile;
 
 pub fn sanitize_webp(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, ImageParseError> {
     if buffer.len() < 12 || &buffer[0..4] != b"RIFF" || &buffer[8..12] != b"WEBP" {
@@ -23,7 +23,7 @@ pub fn sanitize_webp(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, Im
             buffer[cursor + 7],
         ]) as usize;
 
-        let padded_len = if length % 2 != 0 { length + 1 } else { length };
+        let padded_len = if length % 2 == 1 { length + 1 } else { length };
         let chunk_end = cursor + 8 + padded_len;
 
         if chunk_end > buffer.len() {
@@ -32,7 +32,9 @@ pub fn sanitize_webp(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, Im
 
         let is_removable = match profile {
             CleanProfile::Balanced => chunk_type == b"EXIF" || chunk_type == b"XMP ",
-            CleanProfile::Strict => chunk_type == b"EXIF" || chunk_type == b"XMP " || chunk_type == b"ICCP",
+            CleanProfile::Strict => {
+                chunk_type == b"EXIF" || chunk_type == b"XMP " || chunk_type == b"ICCP"
+            }
         };
 
         if !is_removable {
@@ -49,12 +51,12 @@ pub fn sanitize_webp(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, Im
                 }
                 output[payload_start] &= !clear_mask;
 
-                if length % 2 != 0 {
+                if length % 2 == 1 {
                     output.push(0);
                 }
             } else {
                 output.extend_from_slice(&buffer[cursor..cursor + 8 + length]);
-                if length % 2 != 0 {
+                if length % 2 == 1 {
                     output.push(0);
                 }
             }

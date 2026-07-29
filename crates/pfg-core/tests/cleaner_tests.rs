@@ -1,7 +1,7 @@
-use std::fs;
-use std::os::unix::fs::symlink;
 use pfg_core::{clean_file, verify_files, CleanOptions, CoreError};
 use pfg_policy::CleanProfile;
+use std::fs;
+use std::os::unix::fs::symlink;
 
 fn create_test_jpeg() -> Vec<u8> {
     let mut jpeg = vec![0xFF, 0xD8]; // SOI
@@ -70,7 +70,10 @@ fn test_clean_file_atomic_and_verification() {
 
     let v_report = verify_files(&test_file, &cleaned_file).expect("verify_files failed");
     assert!(v_report.verified);
-    assert_eq!(v_report.original_findings_count, report.original_findings_count);
+    assert_eq!(
+        v_report.original_findings_count,
+        report.original_findings_count
+    );
     assert_eq!(v_report.remaining_findings_count, 0);
 
     fs::remove_dir_all(&temp_dir).ok();
@@ -126,7 +129,9 @@ fn test_clean_file_safe_name() {
         .collect();
 
     assert_eq!(entries.len(), 2);
-    assert!(entries.iter().any(|name| name != "photo.jpg" && name.ends_with(".jpg")));
+    assert!(entries
+        .iter()
+        .any(|name| name != "photo.jpg" && name.ends_with(".jpg")));
     assert!(!entries.contains(&"photo.pfg.jpg".to_string()));
 
     fs::remove_dir_all(&temp_dir).ok();

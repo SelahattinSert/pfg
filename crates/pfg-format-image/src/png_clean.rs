@@ -1,6 +1,6 @@
+use crate::jpeg::ImageParseError;
 use crc32fast::Hasher;
 use pfg_policy::CleanProfile;
-use crate::jpeg::ImageParseError;
 
 pub fn sanitize_png(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, ImageParseError> {
     if buffer.len() < 8 || &buffer[0..8] != b"\x89PNG\r\n\x1a\n" {
@@ -33,7 +33,20 @@ pub fn sanitize_png(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, Ima
             ),
             CleanProfile::Strict => matches!(
                 chunk_type,
-                b"eXIf" | b"tEXt" | b"zTXt" | b"iTXt" | b"tIME" | b"iCCP" | b"pHYs" | b"sPLT" | b"gAMA" | b"cHRM" | b"sRGB" | b"dSIG" | b"gIFg" | b"gIFx"
+                b"eXIf"
+                    | b"tEXt"
+                    | b"zTXt"
+                    | b"iTXt"
+                    | b"tIME"
+                    | b"iCCP"
+                    | b"pHYs"
+                    | b"sPLT"
+                    | b"gAMA"
+                    | b"cHRM"
+                    | b"sRGB"
+                    | b"dSIG"
+                    | b"gIFg"
+                    | b"gIFx"
             ),
         };
 

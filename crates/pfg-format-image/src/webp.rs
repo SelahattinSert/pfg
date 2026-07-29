@@ -44,7 +44,9 @@ pub fn scan_webp_metadata(
                     location: FindingLocation::Offset {
                         byte_offset: cursor as u64,
                     },
-                    risk_explanation: "WebP EXIF chunk contains camera, location, or hardware details.".to_string(),
+                    risk_explanation:
+                        "WebP EXIF chunk contains camera, location, or hardware details."
+                            .to_string(),
                     removable: true,
                 });
                 finding_counter += 1;
@@ -78,7 +80,8 @@ pub fn scan_webp_metadata(
                     location: FindingLocation::Offset {
                         byte_offset: cursor as u64,
                     },
-                    risk_explanation: "WebP ICCP chunk contains embedded color profile.".to_string(),
+                    risk_explanation: "WebP ICCP chunk contains embedded color profile."
+                        .to_string(),
                     removable: true,
                 });
                 finding_counter += 1;
@@ -86,7 +89,11 @@ pub fn scan_webp_metadata(
             _ => {}
         }
 
-        let padded_size = if chunk_size % 2 == 1 { chunk_size + 1 } else { chunk_size };
+        let padded_size = if chunk_size % 2 == 1 {
+            chunk_size + 1
+        } else {
+            chunk_size
+        };
         cursor = data_start + padded_size;
     }
 

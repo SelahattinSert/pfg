@@ -84,15 +84,27 @@ fn test_scan_office_core_and_app_metadata() {
     assert_eq!(creator.display_value.as_deref(), Some("Alice Developer"));
     assert_eq!(creator.source, FindingSource::OfficeXml);
 
-    let last_modified = findings.iter().find(|f| f.key == "cp:lastModifiedBy").unwrap();
+    let last_modified = findings
+        .iter()
+        .find(|f| f.key == "cp:lastModifiedBy")
+        .unwrap();
     assert_eq!(last_modified.category, FindingCategory::Identity);
     assert_eq!(last_modified.display_value.as_deref(), Some("Bob Reviewer"));
 
-    let created = findings.iter().find(|f| f.key == "dcterms:created").unwrap();
+    let created = findings
+        .iter()
+        .find(|f| f.key == "dcterms:created")
+        .unwrap();
     assert_eq!(created.category, FindingCategory::Time);
-    assert_eq!(created.display_value.as_deref(), Some("2026-01-01T10:00:00Z"));
+    assert_eq!(
+        created.display_value.as_deref(),
+        Some("2026-01-01T10:00:00Z")
+    );
 
-    let modified = findings.iter().find(|f| f.key == "dcterms:modified").unwrap();
+    let modified = findings
+        .iter()
+        .find(|f| f.key == "dcterms:modified")
+        .unwrap();
     assert_eq!(modified.category, FindingCategory::Time);
 
     let title = findings.iter().find(|f| f.key == "dc:title").unwrap();
@@ -140,18 +152,33 @@ fn test_scan_office_custom_vba_comments_thumbnail() {
 
     let findings = scan_office_metadata(&zip_data, &policy).expect("Scan should succeed");
 
-    let custom = findings.iter().find(|f| f.key == "docProps/custom.xml").unwrap();
+    let custom = findings
+        .iter()
+        .find(|f| f.key == "docProps/custom.xml")
+        .unwrap();
     assert_eq!(custom.category, FindingCategory::DocumentHistory);
 
-    let vba = findings.iter().find(|f| f.key == "xl/vbaProject.bin").unwrap();
+    let vba = findings
+        .iter()
+        .find(|f| f.key == "xl/vbaProject.bin")
+        .unwrap();
     assert_eq!(vba.category, FindingCategory::EmbeddedContent);
 
-    let ole = findings.iter().find(|f| f.key == "xl/embeddings/oleObject1.bin").unwrap();
+    let ole = findings
+        .iter()
+        .find(|f| f.key == "xl/embeddings/oleObject1.bin")
+        .unwrap();
     assert_eq!(ole.category, FindingCategory::EmbeddedContent);
 
-    let comments = findings.iter().find(|f| f.key == "xl/comments1.xml").unwrap();
+    let comments = findings
+        .iter()
+        .find(|f| f.key == "xl/comments1.xml")
+        .unwrap();
     assert_eq!(comments.category, FindingCategory::Comments);
 
-    let thumb = findings.iter().find(|f| f.key == "docProps/thumbnail.jpeg").unwrap();
+    let thumb = findings
+        .iter()
+        .find(|f| f.key == "docProps/thumbnail.jpeg")
+        .unwrap();
     assert_eq!(thumb.category, FindingCategory::Thumbnail);
 }

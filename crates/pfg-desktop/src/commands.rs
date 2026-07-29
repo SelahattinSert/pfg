@@ -1,12 +1,12 @@
 #![forbid(unsafe_code)]
 
-use std::path::PathBuf;
 use pfg_core::{
     clean_directory, clean_file, scan_directory, scan_file, verify_files, BatchCleanOptions,
     BatchCleanReport, BatchScanOptions, BatchScanReport, CleanOptions, CleanProfile, ScanOptions,
     VerificationReport,
 };
 use pfg_model::ScanReport;
+use std::path::PathBuf;
 
 fn parse_profile(profile_str: &str) -> Result<CleanProfile, String> {
     match profile_str.to_lowercase().as_str() {

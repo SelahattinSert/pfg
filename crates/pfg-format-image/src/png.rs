@@ -43,13 +43,17 @@ pub fn scan_png_metadata(
                     location: FindingLocation::Offset {
                         byte_offset: cursor as u64,
                     },
-                    risk_explanation: "PNG eXIf chunk contains camera, location, or capture hardware details.".to_string(),
+                    risk_explanation:
+                        "PNG eXIf chunk contains camera, location, or capture hardware details."
+                            .to_string(),
                     removable: true,
                 });
                 finding_counter += 1;
             }
             b"tEXt" | b"zTXt" | b"iTXt" => {
-                let chunk_name = std::str::from_utf8(chunk_type).unwrap_or("text").to_string();
+                let chunk_name = std::str::from_utf8(chunk_type)
+                    .unwrap_or("text")
+                    .to_string();
                 let data_slice = &buffer[cursor + 8..cursor + 8 + length];
                 let key_str = data_slice
                     .split(|&b| b == 0)
@@ -69,7 +73,10 @@ pub fn scan_png_metadata(
                     location: FindingLocation::Offset {
                         byte_offset: cursor as u64,
                     },
-                    risk_explanation: format!("PNG {} chunk contains textual metadata ({})", chunk_name, key_str),
+                    risk_explanation: format!(
+                        "PNG {} chunk contains textual metadata ({})",
+                        chunk_name, key_str
+                    ),
                     removable: true,
                 });
                 finding_counter += 1;
@@ -86,7 +93,9 @@ pub fn scan_png_metadata(
                     location: FindingLocation::Offset {
                         byte_offset: cursor as u64,
                     },
-                    risk_explanation: "PNG tIME chunk exposes precise file modification date and time.".to_string(),
+                    risk_explanation:
+                        "PNG tIME chunk exposes precise file modification date and time."
+                            .to_string(),
                     removable: true,
                 });
                 finding_counter += 1;
@@ -103,7 +112,8 @@ pub fn scan_png_metadata(
                     location: FindingLocation::Offset {
                         byte_offset: cursor as u64,
                     },
-                    risk_explanation: "PNG iCCP chunk contains embedded color profile metadata.".to_string(),
+                    risk_explanation: "PNG iCCP chunk contains embedded color profile metadata."
+                        .to_string(),
                     removable: true,
                 });
                 finding_counter += 1;

@@ -1,8 +1,8 @@
+use pfg_core::{clean_file, scan_file, verify_files, CleanOptions, CleanProfile, ScanOptions};
 use std::fs;
 use std::io::Write;
 use zip::write::FileOptions;
 use zip::ZipWriter;
-use pfg_core::{clean_file, scan_file, verify_files, CleanOptions, CleanProfile, ScanOptions};
 
 fn create_sample_office_zip(format_entry: &str) -> Vec<u8> {
     let mut buf = Vec::new();
@@ -39,7 +39,9 @@ fn test_scan_docx_file_pipeline() {
     let file_path = temp_dir.join("sample.docx");
     fs::write(&file_path, create_sample_office_zip("word/document.xml")).unwrap();
 
-    let options = ScanOptions { include_values: true };
+    let options = ScanOptions {
+        include_values: true,
+    };
     let report = scan_file(&file_path, &options).expect("scan_file for DOCX should succeed");
 
     assert_eq!(report.detected_format, "docx");
@@ -58,7 +60,9 @@ fn test_scan_xlsx_file_pipeline() {
     let file_path = temp_dir.join("sample.xlsx");
     fs::write(&file_path, create_sample_office_zip("xl/workbook.xml")).unwrap();
 
-    let options = ScanOptions { include_values: true };
+    let options = ScanOptions {
+        include_values: true,
+    };
     let report = scan_file(&file_path, &options).expect("scan_file for XLSX should succeed");
 
     assert_eq!(report.detected_format, "xlsx");
@@ -76,7 +80,9 @@ fn test_scan_pptx_file_pipeline() {
     let file_path = temp_dir.join("sample.pptx");
     fs::write(&file_path, create_sample_office_zip("ppt/presentation.xml")).unwrap();
 
-    let options = ScanOptions { include_values: true };
+    let options = ScanOptions {
+        include_values: true,
+    };
     let report = scan_file(&file_path, &options).expect("scan_file for PPTX should succeed");
 
     assert_eq!(report.detected_format, "pptx");
@@ -108,11 +114,18 @@ fn test_clean_office_file_pipeline() {
     assert_eq!(report.remaining_findings_count, 0);
 
     let cleaned_file = temp_dir.join("document.pfg.docx");
-    assert!(cleaned_file.exists(), "Cleaned DOCX file document.pfg.docx should exist");
+    assert!(
+        cleaned_file.exists(),
+        "Cleaned DOCX file document.pfg.docx should exist"
+    );
 
-    let v_report = verify_files(&docx_path, &cleaned_file).expect("verify_files should succeed for DOCX");
+    let v_report =
+        verify_files(&docx_path, &cleaned_file).expect("verify_files should succeed for DOCX");
     assert!(v_report.verified);
-    assert_eq!(v_report.original_findings_count, report.original_findings_count);
+    assert_eq!(
+        v_report.original_findings_count,
+        report.original_findings_count
+    );
     assert_eq!(v_report.remaining_findings_count, 0);
 
     fs::remove_dir_all(&temp_dir).ok();

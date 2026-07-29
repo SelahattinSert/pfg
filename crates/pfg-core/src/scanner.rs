@@ -1,11 +1,13 @@
-use std::fs;
-use std::path::Path;
-use pfg_format_image::{detect_format, scan_jpeg_metadata, scan_png_metadata, scan_webp_metadata, ImageFormat};
+use pfg_format_image::{
+    detect_format, scan_jpeg_metadata, scan_png_metadata, scan_webp_metadata, ImageFormat,
+};
 use pfg_format_office::{detect_office_format, scan_office_metadata, OfficeFormat};
 use pfg_format_pdf::{detect_pdf_format, scan_pdf_metadata};
 use pfg_model::{FindingSummary, InputFileMetadata, ScanReport, Severity};
 use pfg_policy::PolicyEngine;
 use sha2::{Digest, Sha256};
+use std::fs;
+use std::path::Path;
 use thiserror::Error;
 
 use crate::masking;
@@ -111,4 +113,3 @@ pub fn scan_file(path: &Path, options: &ScanOptions) -> Result<ScanReport, CoreE
         summary,
     })
 }
-

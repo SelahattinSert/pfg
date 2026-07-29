@@ -1,9 +1,9 @@
-use std::io::{Cursor, Read, Write};
-use zip::write::FileOptions;
-use zip::{ZipArchive, ZipWriter};
 use quick_xml::events::Event;
 use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
+use std::io::{Cursor, Read, Write};
+use zip::write::FileOptions;
+use zip::{ZipArchive, ZipWriter};
 
 use pfg_policy::CleanProfile;
 
@@ -13,10 +13,7 @@ use crate::scanner::OfficeParseError;
 /// Sanitizes an Office Open XML document (DOCX, XLSX, PPTX) by redacting
 /// metadata in `docProps/core.xml` and `docProps/app.xml`, stripping custom properties,
 /// thumbnails, VBA macros, stripping comments in `Strict` mode, and cleaning relationships.
-pub fn sanitize_office(
-    buffer: &[u8],
-    profile: CleanProfile,
-) -> Result<Vec<u8>, OfficeParseError> {
+pub fn sanitize_office(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, OfficeParseError> {
     // 1. Check magic bytes
     if buffer.len() < 4 || &buffer[0..4] != b"PK\x03\x04" {
         return Err(OfficeParseError::InvalidContainer);
@@ -24,11 +21,13 @@ pub fn sanitize_office(
 
     // 2. Validate zip archive
     let cursor = Cursor::new(buffer);
-    let mut archive = ZipArchive::new(cursor)
-        .map_err(|err| OfficeParseError::CorruptedZip(err.to_string()))?;
+    let mut archive =
+        ZipArchive::new(cursor).map_err(|err| OfficeParseError::CorruptedZip(err.to_string()))?;
 
     if archive.len() > 10_000 {
-        return Err(OfficeParseError::CorruptedZip("Zip bomb limit exceeded: too many entries".to_string()));
+        return Err(OfficeParseError::CorruptedZip(
+            "Zip bomb limit exceeded: too many entries".to_string(),
+        ));
     }
 
     let mut total_uncompressed: u64 = 0;
@@ -36,7 +35,9 @@ pub fn sanitize_office(
         if let Ok(file) = archive.by_index(i) {
             total_uncompressed += file.size();
             if total_uncompressed > 500 * 1024 * 1024 {
-                return Err(OfficeParseError::CorruptedZip("Zip bomb limit exceeded: total uncompressed size exceeds 500 MB".to_string()));
+                return Err(OfficeParseError::CorruptedZip(
+                    "Zip bomb limit exceeded: total uncompressed size exceeds 500 MB".to_string(),
+                ));
             }
         }
     }
@@ -120,19 +121,21 @@ fn should_strip_entry(name: &str, profile: CleanProfile) -> bool {
     }
 
     // 3. vbaProject.bin, word/vbaProject.bin, xl/vbaProject.bin, etc.
-    if name == "vbaProject.bin" || name.ends_with("/vbaProject.bin") || name.contains("vbaProject.bin") {
+    if name == "vbaProject.bin"
+        || name.ends_with("/vbaProject.bin")
+        || name.contains("vbaProject.bin")
+    {
         return true;
     }
 
     // 4. Strip comments files in Strict profile
-    if profile == CleanProfile::Strict {
-        if name.starts_with("word/comments")
+    if profile == CleanProfile::Strict
+        && (name.starts_with("word/comments")
             || name.starts_with("xl/comments")
             || name.starts_with("ppt/comments")
-            || name.ends_with("comments.xml")
-        {
-            return true;
-        }
+            || name.ends_with("comments.xml"))
+    {
+        return true;
     }
 
     false
@@ -154,7 +157,10 @@ fn clean_content_types_xml(content: &[u8], stripped_parts: &[String]) -> Vec<u8>
                         if attr.key.as_ref() == b"PartName" {
                             let val = String::from_utf8_lossy(&attr.value);
                             let normalized_val = val.trim_start_matches('/');
-                            if stripped_parts.iter().any(|p| p == normalized_val || p.ends_with(normalized_val)) {
+                            if stripped_parts
+                                .iter()
+                                .any(|p| p == normalized_val || p.ends_with(normalized_val))
+                            {
                                 should_skip = true;
                                 break;
                             }
@@ -194,7 +200,9 @@ fn clean_rels_xml(content: &[u8], stripped_parts: &[String]) -> Vec<u8> {
                         if attr.key.as_ref() == b"Target" {
                             let val = String::from_utf8_lossy(&attr.value);
                             let target_normalized = val.trim_start_matches('/');
-                            if stripped_parts.iter().any(|p| p.ends_with(target_normalized) || target_normalized.ends_with(p)) {
+                            if stripped_parts.iter().any(|p| {
+                                p.ends_with(target_normalized) || target_normalized.ends_with(p)
+                            }) {
                                 should_skip = true;
                                 break;
                             }
@@ -280,7 +288,8 @@ fn redact_xml_tags(xml: &str, target_local_names: &[&str]) -> String {
         let open_end = open_start + open_end_rel;
         let tag_header = &xml[open_start + 1..open_end];
 
-        if tag_header.starts_with('?') || tag_header.starts_with('!') || tag_header.starts_with('/') {
+        if tag_header.starts_with('?') || tag_header.starts_with('!') || tag_header.starts_with('/')
+        {
             result.push_str(&xml[open_start..=open_end]);
             search_idx = open_end + 1;
             continue;
@@ -317,11 +326,12 @@ fn redact_xml_tags(xml: &str, target_local_names: &[&str]) -> String {
                     if let Some(c_end_rel) = xml[c_start_abs..].find('>') {
                         let c_end_abs = c_start_abs + c_end_rel;
                         let close_header = xml[c_start_abs + 2..c_end_abs].trim();
-                        let close_local = if let Some((_prefix, local)) = close_header.split_once(':') {
-                            local
-                        } else {
-                            close_header
-                        };
+                        let close_local =
+                            if let Some((_prefix, local)) = close_header.split_once(':') {
+                                local
+                            } else {
+                                close_header
+                            };
                         if close_local == local_name {
                             found_close = Some((c_start_abs, c_end_abs));
                             break;

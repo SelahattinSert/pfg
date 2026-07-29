@@ -40,10 +40,18 @@ fn test_scan_pdf_info_dictionary() {
 
     let findings = scan_pdf_metadata(&pdf_bytes, &policy).unwrap();
 
-    assert!(findings.iter().any(|f| f.source == FindingSource::PdfInfo && f.key == "Title" && f.display_value.as_deref() == Some("Confidential Report")));
-    assert!(findings.iter().any(|f| f.source == FindingSource::PdfInfo && f.key == "Author" && f.category == FindingCategory::Identity));
-    assert!(findings.iter().any(|f| f.source == FindingSource::PdfInfo && f.key == "Creator" && f.category == FindingCategory::Software));
-    assert!(findings.iter().any(|f| f.source == FindingSource::PdfInfo && f.key == "CreationDate" && f.category == FindingCategory::Time));
+    assert!(findings.iter().any(|f| f.source == FindingSource::PdfInfo
+        && f.key == "Title"
+        && f.display_value.as_deref() == Some("Confidential Report")));
+    assert!(findings.iter().any(|f| f.source == FindingSource::PdfInfo
+        && f.key == "Author"
+        && f.category == FindingCategory::Identity));
+    assert!(findings.iter().any(|f| f.source == FindingSource::PdfInfo
+        && f.key == "Creator"
+        && f.category == FindingCategory::Software));
+    assert!(findings.iter().any(|f| f.source == FindingSource::PdfInfo
+        && f.key == "CreationDate"
+        && f.category == FindingCategory::Time));
 }
 
 #[test]
@@ -70,9 +78,12 @@ fn test_scan_pdf_xmp_metadata_stream() {
     );
 
     let stream_id = doc.add_object(xmp_stream);
-    doc.trailer.set("Root", dictionary! {
-        "Metadata" => stream_id,
-    });
+    doc.trailer.set(
+        "Root",
+        dictionary! {
+            "Metadata" => stream_id,
+        },
+    );
 
     let mut pdf_bytes = Vec::new();
     doc.save_to(&mut pdf_bytes).unwrap();
@@ -80,7 +91,9 @@ fn test_scan_pdf_xmp_metadata_stream() {
     let findings = scan_pdf_metadata(&pdf_bytes, &policy).unwrap();
 
     assert!(findings.iter().any(|f| f.key == "XMP Metadata"));
-    assert!(findings.iter().any(|f| f.key == "dc:creator" && f.display_value.as_deref() == Some("John Doe")));
+    assert!(findings
+        .iter()
+        .any(|f| f.key == "dc:creator" && f.display_value.as_deref() == Some("John Doe")));
 }
 
 #[test]
@@ -100,7 +113,9 @@ fn test_scan_pdf_javascript_actions() {
 
     let findings = scan_pdf_metadata(&pdf_bytes, &policy).unwrap();
 
-    assert!(findings.iter().any(|f| f.key.contains("JavaScript") || f.key.contains("JS")));
+    assert!(findings
+        .iter()
+        .any(|f| f.key.contains("JavaScript") || f.key.contains("JS")));
 }
 
 #[test]
@@ -122,20 +137,27 @@ fn test_scan_pdf_embedded_files_and_annots() {
         },
     });
 
-    doc.trailer.set("Root", dictionary! {
-        "Annots" => Object::Array(vec![Object::Reference(annot_obj)]),
-        "Names" => dictionary! {
-            "EmbeddedFiles" => ef_obj,
+    doc.trailer.set(
+        "Root",
+        dictionary! {
+            "Annots" => Object::Array(vec![Object::Reference(annot_obj)]),
+            "Names" => dictionary! {
+                "EmbeddedFiles" => ef_obj,
+            },
         },
-    });
+    );
 
     let mut pdf_bytes = Vec::new();
     doc.save_to(&mut pdf_bytes).unwrap();
 
     let findings = scan_pdf_metadata(&pdf_bytes, &policy).unwrap();
 
-    assert!(findings.iter().any(|f| f.key == "Annotation" || f.key == "Annots"));
-    assert!(findings.iter().any(|f| f.key == "EmbeddedFile" || f.key == "EmbeddedFiles"));
+    assert!(findings
+        .iter()
+        .any(|f| f.key == "Annotation" || f.key == "Annots"));
+    assert!(findings
+        .iter()
+        .any(|f| f.key == "EmbeddedFile" || f.key == "EmbeddedFiles"));
 }
 
 #[test]
@@ -164,5 +186,7 @@ fn test_scan_pdf_encrypt_and_sig() {
     let findings = scan_pdf_metadata(&pdf_bytes, &policy).unwrap();
 
     assert!(findings.iter().any(|f| f.key == "Encrypt"));
-    assert!(findings.iter().any(|f| f.key == "Digital Signature" || f.key == "Sig"));
+    assert!(findings
+        .iter()
+        .any(|f| f.key == "Digital Signature" || f.key == "Sig"));
 }

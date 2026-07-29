@@ -28,12 +28,13 @@ pub fn scan_office_metadata(
 
     // 2. Validate zip archive structure
     let cursor = Cursor::new(buffer);
-    let mut archive = ZipArchive::new(cursor).map_err(|err| {
-        OfficeParseError::CorruptedZip(err.to_string())
-    })?;
+    let mut archive =
+        ZipArchive::new(cursor).map_err(|err| OfficeParseError::CorruptedZip(err.to_string()))?;
 
     if archive.len() > 10_000 {
-        return Err(OfficeParseError::CorruptedZip("Zip bomb limit exceeded: too many entries".to_string()));
+        return Err(OfficeParseError::CorruptedZip(
+            "Zip bomb limit exceeded: too many entries".to_string(),
+        ));
     }
 
     let mut total_uncompressed: u64 = 0;
@@ -41,7 +42,9 @@ pub fn scan_office_metadata(
         if let Ok(file) = archive.by_index(i) {
             total_uncompressed += file.size();
             if total_uncompressed > 500 * 1024 * 1024 {
-                return Err(OfficeParseError::CorruptedZip("Zip bomb limit exceeded: total uncompressed size exceeds 500 MB".to_string()));
+                return Err(OfficeParseError::CorruptedZip(
+                    "Zip bomb limit exceeded: total uncompressed size exceeds 500 MB".to_string(),
+                ));
             }
         }
     }
@@ -282,7 +285,7 @@ fn sanitize_id(name: &str) -> String {
         .collect()
 }
 
-fn extract_xml_element_text<'a>(xml: &'a str, tag_local_name: &str) -> Option<String> {
+fn extract_xml_element_text(xml: &str, tag_local_name: &str) -> Option<String> {
     let mut search_idx = 0;
     while search_idx < xml.len() {
         let open_rel = xml[search_idx..].find('<')?;

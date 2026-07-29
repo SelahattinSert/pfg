@@ -12,7 +12,10 @@ use pfg_core::{
 use pfg_model::Severity;
 
 #[derive(Parser)]
-#[command(name = "pfg", about = "Privacy File Guard - Local metadata scanner and cleaner")]
+#[command(
+    name = "pfg",
+    about = "Privacy File Guard - Local metadata scanner and cleaner"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -141,14 +144,7 @@ impl From<SeverityArg> for Severity {
 
 fn exit_code_for_error(err: &CoreError) -> i32 {
     match err {
-        CoreError::IoError(e) => {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                2
-            } else {
-                2
-            }
-        }
-        CoreError::SymlinkDenied => 2,
+        CoreError::IoError(_) | CoreError::SymlinkDenied => 2,
         CoreError::UnsupportedFormat => 3,
         CoreError::ParseError(_) => 4,
     }
@@ -199,7 +195,10 @@ fn main() {
                             OutputFormat::Text => {
                                 println!("Privacy File Guard Batch Scan Report");
                                 println!("====================================");
-                                println!("Target Directory: {}", batch_report.target_path.display());
+                                println!(
+                                    "Target Directory: {}",
+                                    batch_report.target_path.display()
+                                );
                                 println!("Files Scanned: {}", batch_report.files_scanned);
                                 println!("Files Skipped: {}", batch_report.files_skipped);
                                 println!("Total Findings: {}\n", batch_report.total_findings);
@@ -258,11 +257,7 @@ fn main() {
 
                         if let Some(threshold_arg) = fail_on {
                             let threshold_severity: Severity = threshold_arg.into();
-                            let max_found = scan_report
-                                .findings
-                                .iter()
-                                .map(|f| f.severity)
-                                .max();
+                            let max_found = scan_report.findings.iter().map(|f| f.severity).max();
 
                             if let Some(max_sev) = max_found {
                                 if max_sev >= threshold_severity {
@@ -342,29 +337,27 @@ fn main() {
                 }
             }
         }
-        Commands::Verify { original, cleaned } => {
-            match verify_files(&original, &cleaned) {
-                Ok(report) => {
-                    println!("Privacy File Guard Verification Report");
-                    println!("=====================================");
-                    println!("Original SHA256: {}", report.original_sha256);
-                    println!("Cleaned SHA256:  {}", report.cleaned_sha256);
-                    println!("Original Findings: {}", report.original_findings_count);
-                    println!("Remaining Findings: {}", report.remaining_findings_count);
-                    println!("Verified Clean: {}", report.verified);
-                    println!("Assurance Level: {}", report.assurance_level);
+        Commands::Verify { original, cleaned } => match verify_files(&original, &cleaned) {
+            Ok(report) => {
+                println!("Privacy File Guard Verification Report");
+                println!("=====================================");
+                println!("Original SHA256: {}", report.original_sha256);
+                println!("Cleaned SHA256:  {}", report.cleaned_sha256);
+                println!("Original Findings: {}", report.original_findings_count);
+                println!("Remaining Findings: {}", report.remaining_findings_count);
+                println!("Verified Clean: {}", report.verified);
+                println!("Assurance Level: {}", report.assurance_level);
 
-                    if report.verified {
-                        process::exit(0);
-                    } else {
-                        process::exit(6);
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Verification error: {}", e);
-                    process::exit(exit_code_for_error(&e));
+                if report.verified {
+                    process::exit(0);
+                } else {
+                    process::exit(6);
                 }
             }
-        }
+            Err(e) => {
+                eprintln!("Verification error: {}", e);
+                process::exit(exit_code_for_error(&e));
+            }
+        },
     }
 }

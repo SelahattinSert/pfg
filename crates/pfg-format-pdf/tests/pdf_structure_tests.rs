@@ -40,11 +40,16 @@ fn create_full_pdf_structure() -> Vec<u8> {
 #[test]
 fn test_pdf_catalog_and_page_tree_preserved() {
     let pdf_bytes = create_full_pdf_structure();
-    let sanitized_bytes = sanitize_pdf(&pdf_bytes, CleanProfile::Strict).expect("PDF sanitization must succeed");
+    let sanitized_bytes =
+        sanitize_pdf(&pdf_bytes, CleanProfile::Strict).expect("PDF sanitization must succeed");
 
-    let validation = validate_pdf_structure(&sanitized_bytes).expect("Structure validation must pass");
+    let validation =
+        validate_pdf_structure(&sanitized_bytes).expect("Structure validation must pass");
     assert!(validation.catalog_exists, "Catalog must exist");
     assert!(validation.page_tree_exists, "Page tree must exist");
     assert_eq!(validation.page_count, 1, "Page count must remain 1");
-    assert_eq!(validation.dangling_references_count, 0, "No dangling references must remain");
+    assert_eq!(
+        validation.dangling_references_count, 0,
+        "No dangling references must remain"
+    );
 }

@@ -1,13 +1,14 @@
+use pfg_core::{scan_directory, BatchScanOptions};
 use std::fs;
 use std::path::PathBuf;
-use pfg_core::{scan_directory, BatchScanOptions};
 
 #[test]
 fn test_batch_directory_scanning() {
     let temp_dir = std::env::temp_dir().join("pfg_batch_scan_test");
     fs::create_dir_all(&temp_dir).unwrap();
 
-    let sample_jpg = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/images/sample.jpg");
+    let sample_jpg =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/images/sample.jpg");
     let img1 = temp_dir.join("test1.jpg");
     fs::copy(&sample_jpg, &img1).unwrap();
 

@@ -1,12 +1,13 @@
+use crate::scanner::{scan_file, CoreError, ScanOptions};
+pub use pfg_model::{AssuranceLevel, VerificationCheck, VerificationReport, VerificationStatus};
+use pfg_policy::{CleanProfile, PolicyAction, PolicyEngine};
 use std::fs;
 use std::path::Path;
-pub use pfg_model::{
-    AssuranceLevel, VerificationCheck, VerificationReport, VerificationStatus,
-};
-use pfg_policy::{CleanProfile, PolicyAction, PolicyEngine};
-use crate::scanner::{scan_file, CoreError, ScanOptions};
 
-pub fn verify_files(original_path: &Path, cleaned_path: &Path) -> Result<VerificationReport, CoreError> {
+pub fn verify_files(
+    original_path: &Path,
+    cleaned_path: &Path,
+) -> Result<VerificationReport, CoreError> {
     verify_files_with_profile(original_path, cleaned_path, CleanProfile::Balanced)
 }
 
@@ -15,8 +16,18 @@ pub fn verify_files_with_profile(
     cleaned_path: &Path,
     profile: CleanProfile,
 ) -> Result<VerificationReport, CoreError> {
-    let original_scan = scan_file(original_path, &ScanOptions { include_values: true })?;
-    let cleaned_scan = scan_file(cleaned_path, &ScanOptions { include_values: true })?;
+    let original_scan = scan_file(
+        original_path,
+        &ScanOptions {
+            include_values: true,
+        },
+    )?;
+    let cleaned_scan = scan_file(
+        cleaned_path,
+        &ScanOptions {
+            include_values: true,
+        },
+    )?;
     let cleaned_bytes = fs::read(cleaned_path)?;
 
     let policy = PolicyEngine::for_profile(profile);
@@ -32,15 +43,13 @@ pub fn verify_files_with_profile(
                 decode_passed = false;
             }
         }
-        "pdf" => {
-            if pfg_format_pdf::validate_pdf_structure(&cleaned_bytes).is_err() {
-                decode_passed = false;
-            }
+        "pdf" if pfg_format_pdf::validate_pdf_structure(&cleaned_bytes).is_err() => {
+            decode_passed = false;
         }
-        "docx" | "xlsx" | "pptx" => {
-            if zip::ZipArchive::new(std::io::Cursor::new(&cleaned_bytes)).is_err() {
-                decode_passed = false;
-            }
+        "docx" | "xlsx" | "pptx"
+            if zip::ZipArchive::new(std::io::Cursor::new(&cleaned_bytes)).is_err() =>
+        {
+            decode_passed = false;
         }
         _ => {}
     }
@@ -95,7 +104,11 @@ pub fn verify_files_with_profile(
 
     let verified = decode_passed && policy_passed;
     let assurance_level = if verified {
-        if format_str == "pdf" || format_str == "docx" || format_str == "xlsx" || format_str == "pptx" {
+        if format_str == "pdf"
+            || format_str == "docx"
+            || format_str == "xlsx"
+            || format_str == "pptx"
+        {
             AssuranceLevel::StructurallyVerified
         } else {
             AssuranceLevel::MetadataRemoved

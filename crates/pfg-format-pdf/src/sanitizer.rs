@@ -1,6 +1,6 @@
-use std::collections::HashSet;
 use lopdf::{Document, Object};
 use pfg_policy::CleanProfile;
+use std::collections::HashSet;
 
 use crate::detector::detect_pdf_format;
 use crate::scanner::PdfParseError;
@@ -34,7 +34,9 @@ pub fn sanitize_pdf(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, Pdf
     })?;
 
     if doc.objects.len() > 500_000 {
-        return Err(PdfParseError::CorruptedPdf("PDF object count exceeds resource limit (max 500,000)".to_string()));
+        return Err(PdfParseError::CorruptedPdf(
+            "PDF object count exceeds resource limit (max 500,000)".to_string(),
+        ));
     }
 
     let initial_page_count = doc.get_pages().len();
@@ -105,10 +107,14 @@ pub fn sanitize_pdf(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, Pdf
     let validation = validate_pdf_structure(&bytes)?;
     let has_root = doc.trailer.has(b"Root");
     if has_root && (!validation.catalog_exists || !validation.page_tree_exists) {
-        return Err(PdfParseError::CorruptedPdf("PDF structural validation failed after sanitization".to_string()));
+        return Err(PdfParseError::CorruptedPdf(
+            "PDF structural validation failed after sanitization".to_string(),
+        ));
     }
     if validation.dangling_references_count > 0 {
-        return Err(PdfParseError::CorruptedPdf("PDF structural validation failed: dangling references remain".to_string()));
+        return Err(PdfParseError::CorruptedPdf(
+            "PDF structural validation failed: dangling references remain".to_string(),
+        ));
     }
     if initial_page_count > 0 && validation.page_count != initial_page_count {
         return Err(PdfParseError::CorruptedPdf(format!(
@@ -142,7 +148,7 @@ pub fn validate_pdf_structure(buffer: &[u8]) -> Result<PdfStructureReport, PdfPa
 
     // Check for dangling references in remaining dictionaries
     let mut dangling_count = 0;
-    for (_id, object) in &doc.objects {
+    for object in doc.objects.values() {
         match object {
             Object::Dictionary(dict) => {
                 dangling_count += count_dangling_in_dict(dict, &doc);
@@ -193,9 +199,7 @@ fn is_essential_structure_dict(dict: &lopdf::Dictionary) -> bool {
 }
 
 fn is_metadata_dict(dict: &lopdf::Dictionary) -> bool {
-    dict.get(b"Type")
-        .ok()
-        .and_then(|v| v.as_name_str().ok()) == Some("Metadata")
+    dict.get(b"Type").ok().and_then(|v| v.as_name_str().ok()) == Some("Metadata")
         || dict.get(b"Subtype").ok().and_then(|v| v.as_name_str().ok()) == Some("XML")
 }
 
@@ -210,13 +214,13 @@ fn is_javascript_dict(dict: &lopdf::Dictionary) -> bool {
 fn is_embedded_file_dict(dict: &lopdf::Dictionary) -> bool {
     let type_name = dict.get(b"Type").ok().and_then(|v| v.as_name_str().ok());
     let subtype_name = dict.get(b"Subtype").ok().and_then(|v| v.as_name_str().ok());
-    type_name == Some("Filespec") || type_name == Some("EmbeddedFile") || subtype_name == Some("EmbeddedFile")
+    type_name == Some("Filespec")
+        || type_name == Some("EmbeddedFile")
+        || subtype_name == Some("EmbeddedFile")
 }
 
 fn is_annotation_dict(dict: &lopdf::Dictionary) -> bool {
-    dict.get(b"Type")
-        .ok()
-        .and_then(|v| v.as_name_str().ok()) == Some("Annot")
+    dict.get(b"Type").ok().and_then(|v| v.as_name_str().ok()) == Some("Annot")
 }
 
 fn clean_dictionary(

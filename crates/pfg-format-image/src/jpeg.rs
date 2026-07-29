@@ -46,9 +46,9 @@ pub fn scan_jpeg_metadata(
 
         // Standalone markers with no length payload
         match marker {
-            0xD8 => continue, // SOI
-            0xD9 => break,    // EOI - End of image
-            0x00 => continue, // Escaped byte
+            0xD8 => continue,        // SOI
+            0xD9 => break,           // EOI - End of image
+            0x00 => continue,        // Escaped byte
             0xD0..=0xD7 => continue, // RST0..RST7
             _ => {}
         }
@@ -83,7 +83,8 @@ pub fn scan_jpeg_metadata(
             if payload.starts_with(b"Exif\0\0") && payload.len() >= 6 {
                 let exif_findings = exif::parse_exif(&payload[6..], policy);
                 findings.extend(exif_findings);
-            } else if payload.starts_with(b"http://ns.adobe.com/xap/1.0/\0") && payload.len() >= 29 {
+            } else if payload.starts_with(b"http://ns.adobe.com/xap/1.0/\0") && payload.len() >= 29
+            {
                 let xmp_findings = xmp::parse_xmp(&payload[29..], policy);
                 findings.extend(xmp_findings);
             }

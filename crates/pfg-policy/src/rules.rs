@@ -17,9 +17,9 @@ pub fn categorize_severity(category: FindingCategory, key: &str) -> Severity {
                 Severity::Medium
             }
         }
-        FindingCategory::Software
-        | FindingCategory::Filesystem
-        | FindingCategory::Thumbnail => Severity::Low,
+        FindingCategory::Software | FindingCategory::Filesystem | FindingCategory::Thumbnail => {
+            Severity::Low
+        }
         FindingCategory::Technical | FindingCategory::Unknown => Severity::Informational,
     }
 }

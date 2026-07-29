@@ -3,9 +3,9 @@
 pub mod profile;
 pub mod rules;
 
+use pfg_model::{Finding, FindingCategory, Severity};
 pub use profile::CleanProfile;
 use serde::{Deserialize, Serialize};
-use pfg_model::{FindingCategory, Finding, Severity};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PolicyAction {
@@ -43,19 +43,22 @@ impl PolicyEngine {
     pub fn action_for(&self, finding: &Finding) -> PolicyAction {
         match self.profile {
             CleanProfile::Strict => PolicyAction::Remove,
-            CleanProfile::Balanced => {
-                match finding.category {
-                    FindingCategory::Comments => {
-                        if finding.key == "iCCP" || finding.key == "pHYs" || finding.key == "sPLT" || finding.key == "Annotation" || finding.key == "Annots" {
-                            PolicyAction::Preserve
-                        } else {
-                            PolicyAction::Remove
-                        }
+            CleanProfile::Balanced => match finding.category {
+                FindingCategory::Comments => {
+                    if finding.key == "iCCP"
+                        || finding.key == "pHYs"
+                        || finding.key == "sPLT"
+                        || finding.key == "Annotation"
+                        || finding.key == "Annots"
+                    {
+                        PolicyAction::Preserve
+                    } else {
+                        PolicyAction::Remove
                     }
-                    FindingCategory::EmbeddedContent => PolicyAction::Preserve,
-                    _ => PolicyAction::Remove,
                 }
-            }
+                FindingCategory::EmbeddedContent => PolicyAction::Preserve,
+                _ => PolicyAction::Remove,
+            },
         }
     }
 }

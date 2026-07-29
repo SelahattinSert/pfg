@@ -16,15 +16,21 @@ fn test_cli_help() {
 
     assert!(output.status.success(), "pfg --help should succeed");
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Privacy File Guard"), "Help output should contain app description");
-    assert!(stdout.contains("scan"), "Help output should list scan subcommand");
+    assert!(
+        stdout.contains("Privacy File Guard"),
+        "Help output should contain app description"
+    );
+    assert!(
+        stdout.contains("scan"),
+        "Help output should list scan subcommand"
+    );
 }
 
 #[test]
 fn test_cli_scan_text() {
     let output = Command::new(env!("CARGO_BIN_EXE_pfg"))
         .current_dir(get_workspace_root())
-        .args(&["scan", "fixtures/images/sample.jpg"])
+        .args(["scan", "fixtures/images/sample.jpg"])
         .output()
         .expect("Failed to execute pfg binary");
 
@@ -39,13 +45,17 @@ fn test_cli_scan_text() {
 fn test_cli_scan_json() {
     let output = Command::new(env!("CARGO_BIN_EXE_pfg"))
         .current_dir(get_workspace_root())
-        .args(&["scan", "fixtures/images/sample.jpg", "--format", "json"])
+        .args(["scan", "fixtures/images/sample.jpg", "--format", "json"])
         .output()
         .expect("Failed to execute pfg binary");
 
-    assert!(output.status.success(), "pfg scan --format json should succeed");
+    assert!(
+        output.status.success(),
+        "pfg scan --format json should succeed"
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("Stdout should be valid JSON");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).expect("Stdout should be valid JSON");
     assert_eq!(parsed["detected_format"], "jpeg");
     assert_eq!(parsed["input"]["display_name"], "sample.jpg");
 }
@@ -57,15 +67,24 @@ fn test_cli_scan_report() {
 
     let output = Command::new(env!("CARGO_BIN_EXE_pfg"))
         .current_dir(get_workspace_root())
-        .args(&["scan", "fixtures/images/sample.jpg", "--report", report_path])
+        .args([
+            "scan",
+            "fixtures/images/sample.jpg",
+            "--report",
+            report_path,
+        ])
         .output()
         .expect("Failed to execute pfg binary");
 
     assert!(output.status.success(), "pfg scan --report should succeed");
-    assert!(fs::metadata(report_path).is_ok(), "Report file should be created");
+    assert!(
+        fs::metadata(report_path).is_ok(),
+        "Report file should be created"
+    );
 
     let report_contents = fs::read_to_string(report_path).expect("Report file should be readable");
-    let parsed: serde_json::Value = serde_json::from_str(&report_contents).expect("Report should be valid JSON");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&report_contents).expect("Report should be valid JSON");
     assert_eq!(parsed["detected_format"], "jpeg");
 
     let _ = fs::remove_file(report_path);
@@ -75,7 +94,7 @@ fn test_cli_scan_report() {
 fn test_cli_scan_fail_on() {
     let output = Command::new(env!("CARGO_BIN_EXE_pfg"))
         .current_dir(get_workspace_root())
-        .args(&["scan", "fixtures/images/sample.jpg", "--fail-on", "low"])
+        .args(["scan", "fixtures/images/sample.jpg", "--fail-on", "low"])
         .output()
         .expect("Failed to execute pfg binary");
 
@@ -94,7 +113,7 @@ fn test_cli_clean_default() {
 
     let output = Command::new(env!("CARGO_BIN_EXE_pfg"))
         .current_dir(get_workspace_root())
-        .args(&[
+        .args([
             "clean",
             "fixtures/images/sample.jpg",
             "-o",
@@ -108,7 +127,10 @@ fn test_cli_clean_default() {
     assert!(stdout.contains("Clean Report") || stdout.contains("Clean Summary"));
 
     let cleaned_file = temp_dir.join("sample.pfg.jpg");
-    assert!(cleaned_file.exists(), "Cleaned output file should be created");
+    assert!(
+        cleaned_file.exists(),
+        "Cleaned output file should be created"
+    );
 
     let _ = fs::remove_dir_all(&temp_dir);
 }
@@ -121,7 +143,7 @@ fn test_cli_clean_strict() {
 
     let output = Command::new(env!("CARGO_BIN_EXE_pfg"))
         .current_dir(get_workspace_root())
-        .args(&[
+        .args([
             "clean",
             "fixtures/images/sample.jpg",
             "--profile",
@@ -132,10 +154,16 @@ fn test_cli_clean_strict() {
         .output()
         .expect("Failed to execute pfg binary");
 
-    assert!(output.status.success(), "pfg clean --profile strict should succeed");
+    assert!(
+        output.status.success(),
+        "pfg clean --profile strict should succeed"
+    );
 
     let cleaned_file = temp_dir.join("sample.pfg.jpg");
-    assert!(cleaned_file.exists(), "Cleaned output file should be created with strict profile");
+    assert!(
+        cleaned_file.exists(),
+        "Cleaned output file should be created with strict profile"
+    );
 
     let _ = fs::remove_dir_all(&temp_dir);
 }
@@ -148,7 +176,7 @@ fn test_cli_clean_safe_name() {
 
     let output = Command::new(env!("CARGO_BIN_EXE_pfg"))
         .current_dir(get_workspace_root())
-        .args(&[
+        .args([
             "clean",
             "fixtures/images/sample.jpg",
             "--safe-name",
@@ -158,7 +186,10 @@ fn test_cli_clean_safe_name() {
         .output()
         .expect("Failed to execute pfg binary");
 
-    assert!(output.status.success(), "pfg clean --safe-name should succeed");
+    assert!(
+        output.status.success(),
+        "pfg clean --safe-name should succeed"
+    );
 
     let entries: Vec<_> = fs::read_dir(&temp_dir)
         .unwrap()
@@ -183,7 +214,7 @@ fn test_cli_verify_clean() {
 
     let clean_output = Command::new(env!("CARGO_BIN_EXE_pfg"))
         .current_dir(get_workspace_root())
-        .args(&[
+        .args([
             "clean",
             "fixtures/images/sample.jpg",
             "-o",
@@ -197,7 +228,7 @@ fn test_cli_verify_clean() {
 
     let verify_output = Command::new(env!("CARGO_BIN_EXE_pfg"))
         .current_dir(get_workspace_root())
-        .args(&[
+        .args([
             "verify",
             "fixtures/images/sample.jpg",
             cleaned_file.to_str().unwrap(),
@@ -220,7 +251,7 @@ fn test_cli_verify_clean() {
 fn test_cli_verify_fail() {
     let verify_output = Command::new(env!("CARGO_BIN_EXE_pfg"))
         .current_dir(get_workspace_root())
-        .args(&[
+        .args([
             "verify",
             "fixtures/images/sample.jpg",
             "fixtures/images/sample.jpg",
@@ -239,13 +270,17 @@ fn test_cli_verify_fail() {
 fn test_cli_pdf_scan() {
     let output = Command::new(env!("CARGO_BIN_EXE_pfg"))
         .current_dir(get_workspace_root())
-        .args(&["scan", "fixtures/pdf/sample.pdf", "--format", "json"])
+        .args(["scan", "fixtures/pdf/sample.pdf", "--format", "json"])
         .output()
         .expect("Failed to execute pfg binary");
 
-    assert!(output.status.success(), "pfg scan fixtures/pdf/sample.pdf should succeed");
+    assert!(
+        output.status.success(),
+        "pfg scan fixtures/pdf/sample.pdf should succeed"
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("Stdout should be valid JSON");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).expect("Stdout should be valid JSON");
     assert_eq!(parsed["detected_format"], "pdf");
     assert!(
         parsed["findings"].as_array().map_or(0, |f| f.len()) > 0,
@@ -261,7 +296,7 @@ fn test_cli_pdf_clean() {
 
     let output = Command::new(env!("CARGO_BIN_EXE_pfg"))
         .current_dir(get_workspace_root())
-        .args(&[
+        .args([
             "clean",
             "fixtures/pdf/sample.pdf",
             "-o",
@@ -270,10 +305,17 @@ fn test_cli_pdf_clean() {
         .output()
         .expect("Failed to execute pfg binary");
 
-    assert_eq!(output.status.code(), Some(0), "pfg clean should exit with code 0");
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "pfg clean should exit with code 0"
+    );
 
     let cleaned_file = temp_dir.join("sample.pfg.pdf");
-    assert!(cleaned_file.exists(), "Cleaned output PDF file should be created");
+    assert!(
+        cleaned_file.exists(),
+        "Cleaned output PDF file should be created"
+    );
 
     let _ = fs::remove_dir_all(&temp_dir);
 }
@@ -286,7 +328,7 @@ fn test_cli_pdf_verify() {
 
     let clean_output = Command::new(env!("CARGO_BIN_EXE_pfg"))
         .current_dir(get_workspace_root())
-        .args(&[
+        .args([
             "clean",
             "fixtures/pdf/sample.pdf",
             "-o",
@@ -300,7 +342,7 @@ fn test_cli_pdf_verify() {
 
     let verify_output = Command::new(env!("CARGO_BIN_EXE_pfg"))
         .current_dir(get_workspace_root())
-        .args(&[
+        .args([
             "verify",
             "fixtures/pdf/sample.pdf",
             cleaned_file.to_str().unwrap(),
@@ -321,13 +363,17 @@ fn test_cli_pdf_verify() {
 fn test_cli_office_scan() {
     let output = Command::new(env!("CARGO_BIN_EXE_pfg"))
         .current_dir(get_workspace_root())
-        .args(&["scan", "fixtures/office/sample.docx", "--format", "json"])
+        .args(["scan", "fixtures/office/sample.docx", "--format", "json"])
         .output()
         .expect("Failed to execute pfg binary");
 
-    assert!(output.status.success(), "pfg scan fixtures/office/sample.docx should succeed");
+    assert!(
+        output.status.success(),
+        "pfg scan fixtures/office/sample.docx should succeed"
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("Stdout should be valid JSON");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).expect("Stdout should be valid JSON");
     assert_eq!(parsed["detected_format"], "docx");
     assert!(
         parsed["findings"].as_array().map_or(0, |f| f.len()) > 0,
@@ -343,7 +389,7 @@ fn test_cli_office_clean() {
 
     let output = Command::new(env!("CARGO_BIN_EXE_pfg"))
         .current_dir(get_workspace_root())
-        .args(&[
+        .args([
             "clean",
             "fixtures/office/sample.docx",
             "-o",
@@ -352,10 +398,17 @@ fn test_cli_office_clean() {
         .output()
         .expect("Failed to execute pfg binary");
 
-    assert_eq!(output.status.code(), Some(0), "pfg clean should exit with code 0");
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "pfg clean should exit with code 0"
+    );
 
     let cleaned_file = temp_dir.join("sample.pfg.docx");
-    assert!(cleaned_file.exists(), "Cleaned output DOCX file should be created");
+    assert!(
+        cleaned_file.exists(),
+        "Cleaned output DOCX file should be created"
+    );
 
     let _ = fs::remove_dir_all(&temp_dir);
 }
@@ -368,7 +421,7 @@ fn test_cli_office_verify() {
 
     let clean_output = Command::new(env!("CARGO_BIN_EXE_pfg"))
         .current_dir(get_workspace_root())
-        .args(&[
+        .args([
             "clean",
             "fixtures/office/sample.docx",
             "-o",
@@ -382,7 +435,7 @@ fn test_cli_office_verify() {
 
     let verify_output = Command::new(env!("CARGO_BIN_EXE_pfg"))
         .current_dir(get_workspace_root())
-        .args(&[
+        .args([
             "verify",
             "fixtures/office/sample.docx",
             cleaned_file.to_str().unwrap(),
@@ -404,7 +457,11 @@ fn test_cli_batch_scan_directory() {
     let temp_dir = std::env::temp_dir().join("pfg_cli_batch_scan_test");
     let _ = fs::remove_dir_all(&temp_dir);
     fs::create_dir_all(&temp_dir).unwrap();
-    fs::copy(get_workspace_root().join("fixtures/images/sample.jpg"), temp_dir.join("sample.jpg")).unwrap();
+    fs::copy(
+        get_workspace_root().join("fixtures/images/sample.jpg"),
+        temp_dir.join("sample.jpg"),
+    )
+    .unwrap();
 
     let out = Command::new(env!("CARGO_BIN_EXE_pfg"))
         .current_dir(get_workspace_root())
@@ -425,7 +482,11 @@ fn test_cli_batch_clean_directory() {
     let temp_dir = std::env::temp_dir().join("pfg_cli_batch_clean_test");
     let _ = fs::remove_dir_all(&temp_dir);
     fs::create_dir_all(&temp_dir).unwrap();
-    fs::copy(get_workspace_root().join("fixtures/images/sample.jpg"), temp_dir.join("sample.jpg")).unwrap();
+    fs::copy(
+        get_workspace_root().join("fixtures/images/sample.jpg"),
+        temp_dir.join("sample.jpg"),
+    )
+    .unwrap();
 
     let out = Command::new(env!("CARGO_BIN_EXE_pfg"))
         .current_dir(get_workspace_root())
@@ -440,6 +501,3 @@ fn test_cli_batch_clean_directory() {
 
     let _ = fs::remove_dir_all(&temp_dir);
 }
-
-
-

@@ -55,7 +55,10 @@ fn test_scan_jpeg_com_segment() {
         .expect("FindingSource::Comment should be present");
 
     assert_eq!(com_finding.category, FindingCategory::Comments);
-    assert_eq!(com_finding.display_value.as_deref(), Some("Privacy Test Comment"));
+    assert_eq!(
+        com_finding.display_value.as_deref(),
+        Some("Privacy Test Comment")
+    );
     assert_eq!(com_finding.severity, Severity::Medium);
 }
 

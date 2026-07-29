@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
 use crate::category::FindingCategory;
 use crate::severity::Severity;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

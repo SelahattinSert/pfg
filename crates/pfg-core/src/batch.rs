@@ -1,11 +1,11 @@
-use std::fs;
-use std::path::{Path, PathBuf};
-use rayon::prelude::*;
-use serde::{Deserialize, Serialize};
-use walkdir::WalkDir;
+use crate::{clean_file, scan_file, CleanOptions, CoreError, ScanOptions, VerificationReport};
 use pfg_model::{FindingSummary, ScanReport};
 use pfg_policy::CleanProfile;
-use crate::{clean_file, scan_file, CleanOptions, CoreError, ScanOptions, VerificationReport};
+use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::{Path, PathBuf};
+use walkdir::WalkDir;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BatchScanOptions {
@@ -47,7 +47,10 @@ pub struct BatchCleanReport {
     pub file_reports: Vec<VerificationReport>,
 }
 
-pub fn scan_directory(path: &Path, options: &BatchScanOptions) -> Result<BatchScanReport, CoreError> {
+pub fn scan_directory(
+    path: &Path,
+    options: &BatchScanOptions,
+) -> Result<BatchScanReport, CoreError> {
     if !path.exists() {
         return Err(CoreError::IoError(std::io::Error::new(
             std::io::ErrorKind::NotFound,
@@ -97,9 +100,7 @@ pub fn scan_directory(path: &Path, options: &BatchScanOptions) -> Result<BatchSc
     let scan_action = || {
         target_files
             .par_iter()
-            .filter_map(|file_path| {
-                scan_file(file_path, &scan_opts).ok()
-            })
+            .filter_map(|file_path| scan_file(file_path, &scan_opts).ok())
             .collect::<Vec<ScanReport>>()
     };
 
@@ -133,7 +134,10 @@ pub fn scan_directory(path: &Path, options: &BatchScanOptions) -> Result<BatchSc
     })
 }
 
-pub fn clean_directory(path: &Path, options: &BatchCleanOptions) -> Result<BatchCleanReport, CoreError> {
+pub fn clean_directory(
+    path: &Path,
+    options: &BatchCleanOptions,
+) -> Result<BatchCleanReport, CoreError> {
     if !path.exists() {
         return Err(CoreError::IoError(std::io::Error::new(
             std::io::ErrorKind::NotFound,
@@ -185,8 +189,12 @@ pub fn clean_directory(path: &Path, options: &BatchCleanOptions) -> Result<Batch
                 match res {
                     Ok(rep) => {
                         if options.in_place && options.output_dir.is_none() {
-                            let ext_str = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
-                            let file_stem = file_path.file_stem().and_then(|s| s.to_str()).unwrap_or("file");
+                            let ext_str =
+                                file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
+                            let file_stem = file_path
+                                .file_stem()
+                                .and_then(|s| s.to_str())
+                                .unwrap_or("file");
                             let generated_name = if options.safe_name {
                                 format!("{}.{}", &rep.cleaned_sha256[..12], ext_str)
                             } else if ext_str.is_empty() {

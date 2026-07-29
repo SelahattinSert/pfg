@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::finding::Finding;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InputFileMetadata {

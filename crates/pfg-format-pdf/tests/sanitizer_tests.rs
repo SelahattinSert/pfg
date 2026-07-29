@@ -37,7 +37,9 @@ fn test_sanitize_pdf_info_dictionary() {
 
     // Verify sanitized scan has no /Info findings
     let sanitized_findings = scan_pdf_metadata(&sanitized_bytes, &policy).unwrap();
-    assert!(!sanitized_findings.iter().any(|f| f.key == "Title" || f.key == "Author"));
+    assert!(!sanitized_findings
+        .iter()
+        .any(|f| f.key == "Title" || f.key == "Author"));
 }
 
 #[test]
@@ -64,20 +66,27 @@ fn test_sanitize_pdf_xmp_metadata() {
     );
 
     let stream_id = doc.add_object(xmp_stream);
-    doc.trailer.set("Root", dictionary! {
-        "Metadata" => stream_id,
-    });
+    doc.trailer.set(
+        "Root",
+        dictionary! {
+            "Metadata" => stream_id,
+        },
+    );
 
     let mut input_bytes = Vec::new();
     doc.save_to(&mut input_bytes).unwrap();
 
     let initial_findings = scan_pdf_metadata(&input_bytes, &policy).unwrap();
-    assert!(initial_findings.iter().any(|f| f.key == "XMP Metadata" || f.key == "dc:creator"));
+    assert!(initial_findings
+        .iter()
+        .any(|f| f.key == "XMP Metadata" || f.key == "dc:creator"));
 
     let sanitized_bytes = sanitize_pdf(&input_bytes, CleanProfile::Balanced).unwrap();
 
     let sanitized_findings = scan_pdf_metadata(&sanitized_bytes, &policy).unwrap();
-    assert!(!sanitized_findings.iter().any(|f| f.key == "XMP Metadata" || f.key == "dc:creator"));
+    assert!(!sanitized_findings
+        .iter()
+        .any(|f| f.key == "XMP Metadata" || f.key == "dc:creator"));
 }
 
 #[test]
@@ -96,12 +105,16 @@ fn test_sanitize_pdf_javascript_actions() {
     doc.save_to(&mut input_bytes).unwrap();
 
     let initial_findings = scan_pdf_metadata(&input_bytes, &policy).unwrap();
-    assert!(initial_findings.iter().any(|f| f.key.contains("JavaScript") || f.key.contains("JS")));
+    assert!(initial_findings
+        .iter()
+        .any(|f| f.key.contains("JavaScript") || f.key.contains("JS")));
 
     let sanitized_bytes = sanitize_pdf(&input_bytes, CleanProfile::Balanced).unwrap();
 
     let sanitized_findings = scan_pdf_metadata(&sanitized_bytes, &policy).unwrap();
-    assert!(!sanitized_findings.iter().any(|f| f.key.contains("JavaScript") || f.key.contains("JS")));
+    assert!(!sanitized_findings
+        .iter()
+        .any(|f| f.key.contains("JavaScript") || f.key.contains("JS")));
 }
 
 #[test]
@@ -117,22 +130,29 @@ fn test_sanitize_pdf_embedded_files() {
         },
     });
 
-    doc.trailer.set("Root", dictionary! {
-        "Names" => dictionary! {
-            "EmbeddedFiles" => ef_obj,
+    doc.trailer.set(
+        "Root",
+        dictionary! {
+            "Names" => dictionary! {
+                "EmbeddedFiles" => ef_obj,
+            },
         },
-    });
+    );
 
     let mut input_bytes = Vec::new();
     doc.save_to(&mut input_bytes).unwrap();
 
     let initial_findings = scan_pdf_metadata(&input_bytes, &policy).unwrap();
-    assert!(initial_findings.iter().any(|f| f.key == "EmbeddedFile" || f.key == "EmbeddedFiles"));
+    assert!(initial_findings
+        .iter()
+        .any(|f| f.key == "EmbeddedFile" || f.key == "EmbeddedFiles"));
 
     let sanitized_bytes = sanitize_pdf(&input_bytes, CleanProfile::Balanced).unwrap();
 
     let sanitized_findings = scan_pdf_metadata(&sanitized_bytes, &policy).unwrap();
-    assert!(!sanitized_findings.iter().any(|f| f.key == "EmbeddedFile" || f.key == "EmbeddedFiles"));
+    assert!(!sanitized_findings
+        .iter()
+        .any(|f| f.key == "EmbeddedFile" || f.key == "EmbeddedFiles"));
 }
 
 #[test]
@@ -146,25 +166,34 @@ fn test_sanitize_pdf_annots_balanced_vs_strict() {
         "Contents" => Object::String(b"Review note".to_vec(), StringFormat::Literal),
     });
 
-    doc.trailer.set("Root", dictionary! {
-        "Annots" => Object::Array(vec![Object::Reference(annot_obj)]),
-    });
+    doc.trailer.set(
+        "Root",
+        dictionary! {
+            "Annots" => Object::Array(vec![Object::Reference(annot_obj)]),
+        },
+    );
 
     let mut input_bytes = Vec::new();
     doc.save_to(&mut input_bytes).unwrap();
 
     let initial_findings = scan_pdf_metadata(&input_bytes, &policy).unwrap();
-    assert!(initial_findings.iter().any(|f| f.key == "Annotation" || f.key == "Annots"));
+    assert!(initial_findings
+        .iter()
+        .any(|f| f.key == "Annotation" || f.key == "Annots"));
 
     // Balanced mode retains annotations
     let balanced_bytes = sanitize_pdf(&input_bytes, CleanProfile::Balanced).unwrap();
     let balanced_findings = scan_pdf_metadata(&balanced_bytes, &policy).unwrap();
-    assert!(balanced_findings.iter().any(|f| f.key == "Annotation" || f.key == "Annots"));
+    assert!(balanced_findings
+        .iter()
+        .any(|f| f.key == "Annotation" || f.key == "Annots"));
 
     // Strict mode removes annotations
     let strict_bytes = sanitize_pdf(&input_bytes, CleanProfile::Strict).unwrap();
     let strict_findings = scan_pdf_metadata(&strict_bytes, &policy).unwrap();
-    assert!(!strict_findings.iter().any(|f| f.key == "Annotation" || f.key == "Annots"));
+    assert!(!strict_findings
+        .iter()
+        .any(|f| f.key == "Annotation" || f.key == "Annots"));
 }
 
 #[test]
@@ -188,8 +217,15 @@ fn test_sanitize_pdf_removes_referenced_info_object() {
 
     assert!(!cleaned_doc.objects.contains_key(&info_id));
 
-    let info_keys: &[&[u8]] = &[b"Author", b"Creator", b"Title", b"Producer", b"Subject", b"Keywords"];
-    for (_id, object) in &cleaned_doc.objects {
+    let info_keys: &[&[u8]] = &[
+        b"Author",
+        b"Creator",
+        b"Title",
+        b"Producer",
+        b"Subject",
+        b"Keywords",
+    ];
+    for object in cleaned_doc.objects.values() {
         if let Ok(dict) = object.as_dict() {
             for key in info_keys {
                 assert!(!dict.has(key), "Found info key {:?} in object", key);
@@ -197,4 +233,3 @@ fn test_sanitize_pdf_removes_referenced_info_object() {
         }
     }
 }
-

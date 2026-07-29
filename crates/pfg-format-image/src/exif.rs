@@ -84,19 +84,13 @@ pub fn extract_orientation(exif_bytes: &[u8]) -> Option<u16> {
         return None;
     }
 
-    let ifd0_offset = match endian.read_u32(&exif_bytes[4..8]) {
-        Some(offset) => offset as usize,
-        None => return None,
-    };
+    let ifd0_offset = endian.read_u32(&exif_bytes[4..8])? as usize;
 
     if ifd0_offset + 2 > exif_bytes.len() {
         return None;
     }
 
-    let num_entries = match endian.read_u16(&exif_bytes[ifd0_offset..ifd0_offset + 2]) {
-        Some(n) => n as usize,
-        None => return None,
-    };
+    let num_entries = endian.read_u16(&exif_bytes[ifd0_offset..ifd0_offset + 2])? as usize;
 
     let entries_start = ifd0_offset + 2;
     if entries_start + num_entries * 12 > exif_bytes.len() {

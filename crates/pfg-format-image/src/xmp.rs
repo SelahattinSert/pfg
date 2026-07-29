@@ -36,11 +36,7 @@ pub fn parse_xmp(xmp_bytes: &[u8], policy: &PolicyEngine) -> Vec<Finding> {
     findings
 }
 
-fn extract_xmp_properties(
-    xmp_str: &str,
-    policy: &PolicyEngine,
-    findings: &mut Vec<Finding>,
-) {
+fn extract_xmp_properties(xmp_str: &str, policy: &PolicyEngine, findings: &mut Vec<Finding>) {
     // List of common property tags to look for in XMP XML
     let property_keys = [
         "dc:creator",
@@ -72,7 +68,10 @@ fn extract_xmp_properties(
                 location: FindingLocation::Header {
                     segment: "APP1/XMP".to_string(),
                 },
-                risk_explanation: format!("XMP property '{}' present in metadata packet.", prop_key),
+                risk_explanation: format!(
+                    "XMP property '{}' present in metadata packet.",
+                    prop_key
+                ),
                 removable: true,
             });
         }
