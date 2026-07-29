@@ -106,7 +106,9 @@ pub fn sanitize_pdf(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, Pdf
     // 4. Perform post-sanitization structural validation
     let validation = validate_pdf_structure(&bytes)?;
     let has_root = doc.trailer.has(b"Root");
-    if has_root && (!validation.catalog_exists || (initial_page_count > 0 && !validation.page_tree_exists)) {
+    if has_root
+        && (!validation.catalog_exists || (initial_page_count > 0 && !validation.page_tree_exists))
+    {
         return Err(PdfParseError::CorruptedPdf(
             "PDF structural validation failed after sanitization".to_string(),
         ));
