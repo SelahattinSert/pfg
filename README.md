@@ -83,7 +83,7 @@ cargo run -p pfg-desktop
 ```
 
 - **Single File Mode**: Drag and drop any supported image or document to inspect findings, toggle raw unmasked values, and execute profile-based sanitization.
-- **Batch Directory Mode**: Select a folder to run parallel multi-core auditing and in-place transactional cleaning.
+- **Batch Directory Mode**: Select a folder to run parallel multi-core auditing and transactional in-place cleaning with backup, rollback protection, and final path verification.
 
 ---
 
@@ -124,7 +124,7 @@ cargo run -p pfg-cli -- clean /path/to/folder -r --in-place
 ## Workspace Architecture
 
 ```text
-privacy-file-guard-source/
+.
 ├── docs/
 │   └── privacy_file_guard_banner.jpg
 ├── crates/

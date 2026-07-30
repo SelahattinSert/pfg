@@ -153,10 +153,9 @@ export const App: React.FC = () => {
     [batchScanReport]
   );
 
-  const handleInspectFileFromBatch = useCallback((fileReport: ScanReport) => {
-    const fullPath = fileReport.input.display_name;
-    setSelectedFilePath(fullPath);
-    setSelectedFileName(fullPath.split('/').pop() || fullPath);
+  const handleInspectFileFromBatch = useCallback((fileReport: ScanReport, filePath: string) => {
+    setSelectedFilePath(filePath);
+    setSelectedFileName(fileReport.input.display_name);
     setSelectedFileSize(fileReport.input.size);
     setReport(fileReport);
     setVerificationReport(null);

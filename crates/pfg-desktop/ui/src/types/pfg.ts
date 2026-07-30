@@ -65,13 +65,15 @@ export interface FindingSummary {
   informational: number;
 }
 
+export type SupportLevel = 'FullSupport' | 'PartialSupport' | 'Unsupported';
+
 export interface ScanReport {
   schema_version: number;
   tool_version: string;
   operation: string;
   input: InputFileMetadata;
   detected_format: string;
-  support_level: string;
+  support_level: SupportLevel;
   findings: Finding[];
   summary: FindingSummary;
 }
@@ -81,6 +83,11 @@ export type AssuranceLevel =
   | 'StructurallyVerified'
   | 'ContainerRebuilt'
   | 'VerificationFailed';
+
+export type ContentTransform =
+  | 'MetadataOnly'
+  | 'PixelOrientationNormalized'
+  | 'ContainerRebuilt';
 
 export type VerificationStatus = 'Passed' | 'Failed' | 'Warning';
 
@@ -98,6 +105,7 @@ export interface VerificationReport {
   required_removals_remaining: number;
   verified: boolean;
   assurance_level: AssuranceLevel;
+  content_transform: ContentTransform;
   checks: VerificationCheck[];
   warnings: string[];
 }
@@ -121,12 +129,30 @@ export interface BatchCleanOptions {
   overwrite: boolean;
 }
 
+export type BatchFileStatus = 'Success' | 'Failed' | 'Skipped';
+
+export interface BatchFileScanResult {
+  file_path: string;
+  status: BatchFileStatus;
+  report?: ScanReport | null;
+  error?: string | null;
+}
+
+export interface BatchFileResult {
+  file_path: string;
+  status: BatchFileStatus;
+  report?: VerificationReport | null;
+  error?: string | null;
+}
+
 export interface BatchScanReport {
   target_path: string;
   files_scanned: number;
   files_skipped: number;
+  files_failed: number;
   total_findings: number;
   reports: ScanReport[];
+  file_results: BatchFileScanResult[];
   summary: FindingSummary;
 }
 
@@ -138,6 +164,7 @@ export interface BatchCleanReport {
   failed_files: number;
   verified_clean_count: number;
   file_reports: VerificationReport[];
+  file_results: BatchFileResult[];
 }
 
 export interface ScanOptions {

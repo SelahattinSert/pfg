@@ -146,7 +146,7 @@ fn exit_code_for_error(err: &CoreError) -> i32 {
     match err {
         CoreError::IoError(_) | CoreError::SymlinkDenied => 2,
         CoreError::UnsupportedFormat => 3,
-        CoreError::ParseError(_) => 4,
+        CoreError::ParseError(_) | CoreError::ResourceLimitExceeded(_) => 4,
     }
 }
 

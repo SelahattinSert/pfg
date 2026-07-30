@@ -11,7 +11,7 @@ pub mod webp_clean;
 pub mod xmp;
 
 pub use detector::{detect_format, ImageFormat};
-pub use jpeg::{scan_jpeg_metadata, ImageParseError};
+pub use jpeg::{extract_jpeg_orientation, scan_jpeg_metadata, ImageParseError};
 pub use jpeg_clean::sanitize_jpeg;
 pub use pfg_policy::CleanProfile;
 pub use png::scan_png_metadata;

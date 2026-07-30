@@ -17,6 +17,23 @@ pub struct FindingSummary {
     pub informational: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SupportLevel {
+    FullSupport,
+    PartialSupport,
+    Unsupported,
+}
+
+impl std::fmt::Display for SupportLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SupportLevel::FullSupport => write!(f, "FullSupport"),
+            SupportLevel::PartialSupport => write!(f, "PartialSupport"),
+            SupportLevel::Unsupported => write!(f, "Unsupported"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScanReport {
     pub schema_version: u32,
@@ -24,7 +41,7 @@ pub struct ScanReport {
     pub operation: String,
     pub input: InputFileMetadata,
     pub detected_format: String,
-    pub support_level: String,
+    pub support_level: SupportLevel,
     pub findings: Vec<Finding>,
     pub summary: FindingSummary,
 }
@@ -44,6 +61,25 @@ impl std::fmt::Display for AssuranceLevel {
             AssuranceLevel::StructurallyVerified => write!(f, "Structurally Verified"),
             AssuranceLevel::ContainerRebuilt => write!(f, "Container Rebuilt"),
             AssuranceLevel::VerificationFailed => write!(f, "Verification Failed"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ContentTransform {
+    MetadataOnly,
+    PixelOrientationNormalized,
+    ContainerRebuilt,
+}
+
+impl std::fmt::Display for ContentTransform {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ContentTransform::MetadataOnly => write!(f, "Metadata Only"),
+            ContentTransform::PixelOrientationNormalized => {
+                write!(f, "Pixel Orientation Normalized")
+            }
+            ContentTransform::ContainerRebuilt => write!(f, "Container Rebuilt"),
         }
     }
 }
@@ -71,6 +107,7 @@ pub struct VerificationReport {
     pub required_removals_remaining: usize,
     pub verified: bool,
     pub assurance_level: AssuranceLevel,
+    pub content_transform: ContentTransform,
     pub checks: Vec<VerificationCheck>,
     pub warnings: Vec<String>,
 }

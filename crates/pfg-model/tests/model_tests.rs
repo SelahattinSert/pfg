@@ -27,7 +27,7 @@ fn test_finding_and_report_serialization() {
             sha256: "abc...".to_string(),
         },
         detected_format: "jpeg".to_string(),
-        support_level: "full".to_string(),
+        support_level: SupportLevel::FullSupport,
         findings: vec![finding],
         summary: FindingSummary {
             critical: 0,
