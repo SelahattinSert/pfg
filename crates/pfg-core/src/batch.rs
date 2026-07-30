@@ -1,10 +1,9 @@
-use crate::cleaner::{clean_file, perform_transactional_replace, CleanOptions};
+use crate::cleaner::{clean_file, clean_file_in_place, CleanOptions};
 use crate::scanner::{scan_file, CoreError, ScanOptions};
 use pfg_model::{FindingSummary, ScanReport, VerificationReport};
 use pfg_policy::CleanProfile;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
@@ -91,6 +90,8 @@ pub fn scan_directory(
         ));
     }
 
+    let limits = crate::ResourceLimits::default();
+
     let mut walker = WalkDir::new(path);
     if !options.recursive {
         walker = walker.max_depth(1);
@@ -121,14 +122,15 @@ pub fn scan_directory(
         .map(|e| e.path().to_path_buf())
         .collect();
 
-    let pool = if let Some(jobs) = options.jobs {
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(jobs)
-            .build()
-            .ok()
-    } else {
-        None
-    };
+    let num_threads = options
+        .jobs
+        .unwrap_or(limits.max_worker_threads)
+        .min(limits.max_worker_threads);
+
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(num_threads)
+        .build()
+        .ok();
 
     let scan_action = || {
         target_files
@@ -213,6 +215,8 @@ pub fn clean_directory(
         ));
     }
 
+    let limits = crate::ResourceLimits::default();
+
     let mut walker = WalkDir::new(path);
     if !options.recursive {
         walker = walker.max_depth(1);
@@ -234,14 +238,15 @@ pub fn clean_directory(
         .map(|e| e.path().to_path_buf())
         .collect();
 
-    let pool = if let Some(jobs) = options.jobs {
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(jobs)
-            .build()
-            .ok()
-    } else {
-        None
-    };
+    let num_threads = options
+        .jobs
+        .unwrap_or(limits.max_worker_threads)
+        .min(limits.max_worker_threads);
+
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(num_threads)
+        .build()
+        .ok();
 
     let clean_action = || {
         target_files
@@ -253,62 +258,19 @@ pub fn clean_directory(
                     safe_name: options.safe_name,
                     overwrite: options.overwrite,
                 };
-                let res = clean_file(file_path, &clean_opts);
+                let res = if options.in_place && options.output_dir.is_none() {
+                    clean_file_in_place(file_path, &clean_opts)
+                } else {
+                    clean_file(file_path, &clean_opts)
+                };
+
                 match res {
-                    Ok(rep) => {
-                        if options.in_place && options.output_dir.is_none() {
-                            // Detect actual format from report to avoid extension mismatch
-                            let ext_str = match rep.assurance_level {
-                                pfg_model::AssuranceLevel::MetadataRemoved => "jpg",
-                                pfg_model::AssuranceLevel::StructurallyVerified => "pdf",
-                                _ => file_path.extension().and_then(|e| e.to_str()).unwrap_or(""),
-                            };
-                            let file_stem = file_path
-                                .file_stem()
-                                .and_then(|s| s.to_str())
-                                .unwrap_or("file");
-                            let generated_name = if options.safe_name {
-                                format!("{}.{}", &rep.cleaned_sha256[..12], ext_str)
-                            } else if ext_str.is_empty() {
-                                format!("{}.pfg", file_stem)
-                            } else {
-                                format!("{}.pfg.{}", file_stem, ext_str)
-                            };
-                            let parent = file_path.parent().unwrap_or_else(|| Path::new("."));
-                            let generated_path = parent.join(generated_name);
-
-                            if generated_path.exists() && generated_path != *file_path {
-                                let tmp_inplace =
-                                    parent.join(format!(".pfg_inp_{}.tmp", uuid::Uuid::new_v4()));
-                                if fs::rename(&generated_path, &tmp_inplace).is_ok() {
-                                    if let Err(tx_err) = perform_transactional_replace(
-                                        &tmp_inplace,
-                                        file_path,
-                                        file_path,
-                                        options.profile,
-                                        &rep,
-                                    ) {
-                                        return BatchFileResult {
-                                            file_path: file_path.clone(),
-                                            status: BatchFileStatus::Failed,
-                                            report: None,
-                                            error: Some(format!(
-                                                "Transactional replace failed: {}",
-                                                tx_err
-                                            )),
-                                        };
-                                    }
-                                }
-                            }
-                        }
-
-                        BatchFileResult {
-                            file_path: file_path.clone(),
-                            status: BatchFileStatus::Success,
-                            report: Some(rep),
-                            error: None,
-                        }
-                    }
+                    Ok(clean_res) => BatchFileResult {
+                        file_path: clean_res.output_path,
+                        status: BatchFileStatus::Success,
+                        report: Some(clean_res.verification),
+                        error: None,
+                    },
                     Err(e) => BatchFileResult {
                         file_path: file_path.clone(),
                         status: BatchFileStatus::Failed,

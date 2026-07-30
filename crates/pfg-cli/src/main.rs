@@ -6,8 +6,8 @@ use std::process;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use pfg_core::{
-    clean_directory, clean_file, scan_directory, scan_file, verify_files, BatchCleanOptions,
-    BatchScanOptions, CleanOptions, CleanProfile, CoreError, ScanOptions,
+    clean_directory, clean_file, clean_file_in_place, scan_directory, scan_file, verify_files,
+    BatchCleanOptions, BatchScanOptions, CleanOptions, CleanProfile, CoreError, ScanOptions,
 };
 use pfg_model::Severity;
 
@@ -204,7 +204,23 @@ fn main() {
                                 println!("Total Findings: {}\n", batch_report.total_findings);
                             }
                         }
-                        process::exit(0);
+                        if let Some(threshold_arg) = fail_on {
+                            let threshold_severity: Severity = threshold_arg.into();
+                            for report in &batch_report.reports {
+                                let max_found = report.findings.iter().map(|f| f.severity).max();
+                                if let Some(max_sev) = max_found {
+                                    if max_sev >= threshold_severity {
+                                        process::exit(1);
+                                    }
+                                }
+                            }
+                        }
+
+                        if batch_report.files_failed > 0 {
+                            process::exit(4);
+                        } else {
+                            process::exit(0);
+                        }
                     }
                     Err(e) => {
                         eprintln!("Batch scan error: {}", e);
@@ -303,7 +319,12 @@ fn main() {
                         println!("Cleaned Files: {}", batch_report.cleaned_files);
                         println!("Verified Clean: {}", batch_report.verified_clean_count);
                         println!("Failed Files:  {}", batch_report.failed_files);
-                        process::exit(0);
+
+                        if batch_report.failed_files > 0 {
+                            process::exit(4);
+                        } else {
+                            process::exit(0);
+                        }
                     }
                     Err(e) => {
                         eprintln!("Batch clean error: {}", e);
@@ -318,30 +339,19 @@ fn main() {
                     overwrite: true,
                 };
 
-                match clean_file(&path, &options) {
-                    Ok(report) => {
-                        if in_place && options.output_dir.is_none() {
-                            let ext_str = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-                            let file_stem =
-                                path.file_stem().and_then(|s| s.to_str()).unwrap_or("file");
-                            let generated_name = if options.safe_name {
-                                format!("{}.{}", &report.cleaned_sha256[..12], ext_str)
-                            } else if ext_str.is_empty() {
-                                format!("{}.pfg", file_stem)
-                            } else {
-                                format!("{}.pfg.{}", file_stem, ext_str)
-                            };
-                            let parent = path.parent().unwrap_or_else(|| std::path::Path::new("."));
-                            let generated_path = parent.join(generated_name);
-                            if generated_path.exists() && generated_path != path {
-                                if let Err(e) = fs::rename(&generated_path, &path) {
-                                    eprintln!("Failed to perform in-place replacement: {}", e);
-                                    process::exit(2);
-                                }
-                            }
-                        }
+                let res = if in_place && options.output_dir.is_none() {
+                    clean_file_in_place(&path, &options)
+                } else {
+                    clean_file(&path, &options)
+                };
+
+                match res {
+                    Ok(clean_res) => {
+                        let report = clean_res.verification;
                         println!("Privacy File Guard Clean Report");
                         println!("==============================");
+                        println!("Output File: {}", clean_res.output_path.display());
+                        println!("Format:      {}", clean_res.detected_format);
                         println!("Original SHA256: {}", report.original_sha256);
                         println!("Cleaned SHA256:  {}", report.cleaned_sha256);
                         println!("Original Findings: {}", report.original_findings_count);

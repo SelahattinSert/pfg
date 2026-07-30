@@ -2,7 +2,7 @@ use image::{GenericImageView, ImageBuffer, Rgb};
 use pfg_format_image::{extract_jpeg_orientation, sanitize_jpeg, CleanProfile};
 
 fn create_test_jpeg_with_orientation(width: u32, height: u32, orientation: u16) -> Vec<u8> {
-    // 1. Create an asymmetric image (e.g., 20x10)
+    // 1. Create an asymmetric image (e.g., 20x10) with distinct color quadrants
     let mut img = ImageBuffer::<Rgb<u8>, Vec<u8>>::new(width, height);
     for y in 0..height {
         for x in 0..width {
@@ -92,6 +92,9 @@ fn test_all_eight_exif_orientations() {
                 orient
             );
         }
+
+        // Verify pixel quadrant sample is readable
+        let _pixel = cleaned_img.get_pixel(1, 1);
 
         let cleaned_extracted = extract_jpeg_orientation(&cleaned_bytes);
         assert_eq!(

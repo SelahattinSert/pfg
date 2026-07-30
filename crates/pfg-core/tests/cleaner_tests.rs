@@ -58,7 +58,8 @@ fn test_clean_file_atomic_and_verification() {
         overwrite: false,
     };
 
-    let report = clean_file(&test_file, &options).expect("clean_file failed");
+    let res = clean_file(&test_file, &options).expect("clean_file failed");
+    let report = res.verification;
     assert!(report.verified);
     assert!(report.original_findings_count > 0);
     assert_eq!(report.remaining_findings_count, 0);
@@ -125,8 +126,8 @@ fn test_clean_file_safe_name() {
         overwrite: false,
     };
 
-    let report = clean_file(&test_file, &options).unwrap();
-    assert!(report.verified);
+    let res = clean_file(&test_file, &options).unwrap();
+    assert!(res.verification.verified);
 
     let entries: Vec<_> = fs::read_dir(&temp_dir)
         .unwrap()

@@ -11,7 +11,7 @@ pub use batch::{
     clean_directory, scan_directory, BatchCleanOptions, BatchCleanReport, BatchScanOptions,
     BatchScanReport,
 };
-pub use cleaner::{clean_file, CleanOptions};
+pub use cleaner::{clean_file, clean_file_in_place, CleanOptions, CleanResult};
 pub use limits::ResourceLimits;
 pub use masking::mask_sensitive_value;
 pub use pfg_policy::CleanProfile;
