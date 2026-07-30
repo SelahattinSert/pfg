@@ -92,11 +92,11 @@ fn test_scan_file_unsupported_format() {
 
 #[test]
 fn test_scan_file_io_error() {
-    let non_existent = std::path::Path::new("/tmp/does_not_exist_pfg_12345.jpg");
+    let non_existent = std::env::temp_dir().join("does_not_exist_pfg_12345.jpg");
     let options = ScanOptions {
         include_values: false,
     };
-    let result = scan_file(non_existent, &options);
+    let result = scan_file(&non_existent, &options);
     assert!(matches!(result, Err(CoreError::IoError(_))));
 }
 

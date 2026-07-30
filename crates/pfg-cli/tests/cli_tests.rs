@@ -62,8 +62,9 @@ fn test_cli_scan_json() {
 
 #[test]
 fn test_cli_scan_report() {
-    let report_path = "/tmp/pfg_report.json";
-    let _ = fs::remove_file(report_path);
+    let report_file = std::env::temp_dir().join("pfg_report.json");
+    let report_path = report_file.to_str().unwrap();
+    let _ = fs::remove_file(&report_file);
 
     let output = Command::new(env!("CARGO_BIN_EXE_pfg"))
         .current_dir(get_workspace_root())
@@ -78,16 +79,16 @@ fn test_cli_scan_report() {
 
     assert!(output.status.success(), "pfg scan --report should succeed");
     assert!(
-        fs::metadata(report_path).is_ok(),
+        fs::metadata(&report_file).is_ok(),
         "Report file should be created"
     );
 
-    let report_contents = fs::read_to_string(report_path).expect("Report file should be readable");
+    let report_contents = fs::read_to_string(&report_file).expect("Report file should be readable");
     let parsed: serde_json::Value =
         serde_json::from_str(&report_contents).expect("Report should be valid JSON");
     assert_eq!(parsed["detected_format"], "jpeg");
 
-    let _ = fs::remove_file(report_path);
+    let _ = fs::remove_file(&report_file);
 }
 
 #[test]
