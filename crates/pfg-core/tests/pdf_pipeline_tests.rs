@@ -56,7 +56,8 @@ fn test_clean_pdf_file_pipeline() {
         overwrite: false,
     };
 
-    let report = clean_file(&pdf_path, &options).expect("clean_file for PDF should succeed");
+    let res = clean_file(&pdf_path, &options).expect("clean_file for PDF should succeed");
+    let report = res.verification;
 
     assert!(report.verified);
     assert!(report.original_findings_count > 0);

@@ -107,7 +107,8 @@ fn test_clean_office_file_pipeline() {
         overwrite: false,
     };
 
-    let report = clean_file(&docx_path, &options).expect("clean_file for DOCX should succeed");
+    let res = clean_file(&docx_path, &options).expect("clean_file for DOCX should succeed");
+    let report = res.verification;
 
     assert!(report.verified);
     assert!(report.original_findings_count > 0);

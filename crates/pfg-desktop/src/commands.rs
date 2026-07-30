@@ -59,7 +59,9 @@ pub fn clean_file_cmd(
         safe_name,
         overwrite: true,
     };
-    clean_file(&path_buf, &options).map_err(|e| e.to_string())
+    clean_file(&path_buf, &options)
+        .map(|res| res.verification)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
