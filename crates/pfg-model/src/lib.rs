@@ -8,7 +8,7 @@ pub mod severity;
 pub use category::FindingCategory;
 pub use finding::{Finding, FindingLocation, FindingSource};
 pub use report::{
-    AssuranceLevel, FindingSummary, InputFileMetadata, ScanReport, VerificationCheck,
-    VerificationReport, VerificationStatus,
+    AssuranceLevel, ContentTransform, FindingSummary, InputFileMetadata, ScanReport, SupportLevel,
+    VerificationCheck, VerificationReport, VerificationStatus,
 };
 pub use severity::Severity;

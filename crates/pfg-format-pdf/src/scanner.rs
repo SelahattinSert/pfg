@@ -13,6 +13,24 @@ pub enum PdfParseError {
     CorruptedPdf(String),
     #[error("Encrypted PDF document")]
     EncryptedPdf,
+    #[error("Signed PDF modification not supported to prevent invalidating digital signature")]
+    SignedPdfNotSupported,
+}
+
+pub fn is_pdf_signed(doc: &Document, buffer: &[u8]) -> bool {
+    for obj in doc.objects.values() {
+        if let Object::Dictionary(dict) = obj {
+            if let Ok(Object::Name(name)) = dict.get(b"Type") {
+                if name == b"Sig" || name == b"DocTimeStamp" {
+                    return true;
+                }
+            }
+            if dict.has(b"ByteRange") && dict.has(b"Contents") {
+                return true;
+            }
+        }
+    }
+    buffer.windows(10).any(|w| w == b"/ByteRange")
 }
 
 pub fn scan_pdf_metadata(

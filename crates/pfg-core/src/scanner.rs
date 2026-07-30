@@ -27,12 +27,23 @@ pub enum CoreError {
     UnsupportedFormat,
     #[error("Parse error: {0}")]
     ParseError(String),
+    #[error("Resource limit exceeded: {0}")]
+    ResourceLimitExceeded(String),
 }
 
 pub fn scan_file(path: &Path, options: &ScanOptions) -> Result<ScanReport, CoreError> {
     let metadata = fs::symlink_metadata(path)?;
     if metadata.file_type().is_symlink() {
         return Err(CoreError::SymlinkDenied);
+    }
+
+    let limits = crate::ResourceLimits::default();
+    if metadata.len() > limits.max_file_size {
+        return Err(CoreError::ResourceLimitExceeded(format!(
+            "File size {} bytes exceeds limit of {} bytes",
+            metadata.len(),
+            limits.max_file_size
+        )));
     }
 
     let buffer = fs::read(path)?;
@@ -98,6 +109,12 @@ pub fn scan_file(path: &Path, options: &ScanOptions) -> Result<ScanReport, CoreE
         .unwrap_or("unknown")
         .to_string();
 
+    let support_level = match detected_format.as_str() {
+        "jpeg" | "png" | "webp" => pfg_model::SupportLevel::FullSupport,
+        "pdf" | "docx" | "xlsx" | "pptx" => pfg_model::SupportLevel::PartialSupport,
+        _ => pfg_model::SupportLevel::Unsupported,
+    };
+
     Ok(ScanReport {
         schema_version: 1,
         tool_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -108,7 +125,7 @@ pub fn scan_file(path: &Path, options: &ScanOptions) -> Result<ScanReport, CoreE
             sha256: hash_hex,
         },
         detected_format,
-        support_level: "full".to_string(),
+        support_level,
         findings,
         summary,
     })

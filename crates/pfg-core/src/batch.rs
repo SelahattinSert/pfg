@@ -1,11 +1,35 @@
-use crate::{clean_file, scan_file, CleanOptions, CoreError, ScanOptions, VerificationReport};
-use pfg_model::{FindingSummary, ScanReport};
+use crate::cleaner::{clean_file, perform_transactional_replace, CleanOptions};
+use crate::scanner::{scan_file, CoreError, ScanOptions};
+use pfg_model::{FindingSummary, ScanReport, VerificationReport};
 use pfg_policy::CleanProfile;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BatchFileStatus {
+    Success,
+    Failed,
+    Skipped,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchFileScanResult {
+    pub file_path: PathBuf,
+    pub status: BatchFileStatus,
+    pub report: Option<ScanReport>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchFileResult {
+    pub file_path: PathBuf,
+    pub status: BatchFileStatus,
+    pub report: Option<VerificationReport>,
+    pub error: Option<String>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BatchScanOptions {
@@ -31,8 +55,10 @@ pub struct BatchScanReport {
     pub target_path: PathBuf,
     pub files_scanned: usize,
     pub files_skipped: usize,
+    pub files_failed: usize,
     pub total_findings: usize,
     pub reports: Vec<ScanReport>,
+    pub file_results: Vec<BatchFileScanResult>,
     pub summary: FindingSummary,
 }
 
@@ -45,6 +71,7 @@ pub struct BatchCleanReport {
     pub failed_files: usize,
     pub verified_clean_count: usize,
     pub file_reports: Vec<VerificationReport>,
+    pub file_results: Vec<BatchFileResult>,
 }
 
 pub fn scan_directory(
@@ -56,6 +83,12 @@ pub fn scan_directory(
             std::io::ErrorKind::NotFound,
             "Target path does not exist",
         )));
+    }
+
+    if options.jobs == Some(0) {
+        return Err(CoreError::ResourceLimitExceeded(
+            "Jobs count cannot be 0".to_string(),
+        ));
     }
 
     let mut walker = WalkDir::new(path);
@@ -100,36 +133,65 @@ pub fn scan_directory(
     let scan_action = || {
         target_files
             .par_iter()
-            .filter_map(|file_path| scan_file(file_path, &scan_opts).ok())
-            .collect::<Vec<ScanReport>>()
+            .map(|file_path| match scan_file(file_path, &scan_opts) {
+                Ok(report) => BatchFileScanResult {
+                    file_path: file_path.clone(),
+                    status: BatchFileStatus::Success,
+                    report: Some(report),
+                    error: None,
+                },
+                Err(err) => BatchFileScanResult {
+                    file_path: file_path.clone(),
+                    status: BatchFileStatus::Failed,
+                    report: None,
+                    error: Some(err.to_string()),
+                },
+            })
+            .collect::<Vec<BatchFileScanResult>>()
     };
 
-    let reports = if let Some(p) = pool {
+    let file_results = if let Some(p) = pool {
         p.install(scan_action)
     } else {
         scan_action()
     };
 
+    let mut reports = Vec::new();
     let mut overall_summary = FindingSummary::default();
     let mut total_findings = 0;
-    for rep in &reports {
-        overall_summary.critical += rep.summary.critical;
-        overall_summary.high += rep.summary.high;
-        overall_summary.medium += rep.summary.medium;
-        overall_summary.low += rep.summary.low;
-        overall_summary.informational += rep.summary.informational;
-        total_findings += rep.findings.len();
+    let mut files_scanned = 0;
+    let mut files_failed = 0;
+
+    for res in &file_results {
+        match &res.report {
+            Some(rep) => {
+                files_scanned += 1;
+                overall_summary.critical += rep.summary.critical;
+                overall_summary.high += rep.summary.high;
+                overall_summary.medium += rep.summary.medium;
+                overall_summary.low += rep.summary.low;
+                overall_summary.informational += rep.summary.informational;
+                total_findings += rep.findings.len();
+                reports.push(rep.clone());
+            }
+            None => {
+                files_failed += 1;
+            }
+        }
     }
 
-    let files_scanned = reports.len();
-    let files_skipped = target_files.len().saturating_sub(files_scanned);
+    let files_skipped = target_files
+        .len()
+        .saturating_sub(files_scanned + files_failed);
 
     Ok(BatchScanReport {
         target_path: path.to_path_buf(),
         files_scanned,
         files_skipped,
+        files_failed,
         total_findings,
         reports,
+        file_results,
         summary: overall_summary,
     })
 }
@@ -143,6 +205,12 @@ pub fn clean_directory(
             std::io::ErrorKind::NotFound,
             "Target path does not exist",
         )));
+    }
+
+    if options.jobs == Some(0) {
+        return Err(CoreError::ResourceLimitExceeded(
+            "Jobs count cannot be 0".to_string(),
+        ));
     }
 
     let mut walker = WalkDir::new(path);
@@ -178,7 +246,7 @@ pub fn clean_directory(
     let clean_action = || {
         target_files
             .par_iter()
-            .filter_map(|file_path| {
+            .map(|file_path| {
                 let clean_opts = CleanOptions {
                     profile: options.profile,
                     output_dir: options.output_dir.clone(),
@@ -189,8 +257,12 @@ pub fn clean_directory(
                 match res {
                     Ok(rep) => {
                         if options.in_place && options.output_dir.is_none() {
-                            let ext_str =
-                                file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
+                            // Detect actual format from report to avoid extension mismatch
+                            let ext_str = match rep.assurance_level {
+                                pfg_model::AssuranceLevel::MetadataRemoved => "jpg",
+                                pfg_model::AssuranceLevel::StructurallyVerified => "pdf",
+                                _ => file_path.extension().and_then(|e| e.to_str()).unwrap_or(""),
+                            };
                             let file_stem = file_path
                                 .file_stem()
                                 .and_then(|s| s.to_str())
@@ -204,30 +276,75 @@ pub fn clean_directory(
                             };
                             let parent = file_path.parent().unwrap_or_else(|| Path::new("."));
                             let generated_path = parent.join(generated_name);
+
                             if generated_path.exists() && generated_path != *file_path {
-                                let _ = fs::rename(&generated_path, file_path);
+                                let tmp_inplace =
+                                    parent.join(format!(".pfg_inp_{}.tmp", uuid::Uuid::new_v4()));
+                                if fs::rename(&generated_path, &tmp_inplace).is_ok() {
+                                    if let Err(tx_err) = perform_transactional_replace(
+                                        &tmp_inplace,
+                                        file_path,
+                                        file_path,
+                                        options.profile,
+                                        &rep,
+                                    ) {
+                                        return BatchFileResult {
+                                            file_path: file_path.clone(),
+                                            status: BatchFileStatus::Failed,
+                                            report: None,
+                                            error: Some(format!(
+                                                "Transactional replace failed: {}",
+                                                tx_err
+                                            )),
+                                        };
+                                    }
+                                }
                             }
                         }
-                        Some(rep)
+
+                        BatchFileResult {
+                            file_path: file_path.clone(),
+                            status: BatchFileStatus::Success,
+                            report: Some(rep),
+                            error: None,
+                        }
                     }
-                    Err(e) => {
-                        eprintln!("Error cleaning {:?}: {:?}", file_path, e);
-                        None
-                    }
+                    Err(e) => BatchFileResult {
+                        file_path: file_path.clone(),
+                        status: BatchFileStatus::Failed,
+                        report: None,
+                        error: Some(e.to_string()),
+                    },
                 }
             })
-            .collect::<Vec<VerificationReport>>()
+            .collect::<Vec<BatchFileResult>>()
     };
 
-    let file_reports = if let Some(p) = pool {
+    let file_results = if let Some(p) = pool {
         p.install(clean_action)
     } else {
         clean_action()
     };
 
-    let cleaned_files = file_reports.len();
-    let verified_clean_count = file_reports.iter().filter(|r| r.verified).count();
-    let failed_files = target_files.len().saturating_sub(cleaned_files);
+    let mut file_reports = Vec::new();
+    let mut cleaned_files = 0;
+    let mut failed_files = 0;
+    let mut verified_clean_count = 0;
+
+    for result in &file_results {
+        match &result.report {
+            Some(rep) => {
+                cleaned_files += 1;
+                if rep.verified {
+                    verified_clean_count += 1;
+                }
+                file_reports.push(rep.clone());
+            }
+            None => {
+                failed_files += 1;
+            }
+        }
+    }
 
     Ok(BatchCleanReport {
         target_path: path.to_path_buf(),
@@ -237,5 +354,6 @@ pub fn clean_directory(
         failed_files,
         verified_clean_count,
         file_reports,
+        file_results,
     })
 }

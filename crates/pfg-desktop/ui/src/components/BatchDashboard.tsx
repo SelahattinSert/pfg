@@ -27,7 +27,7 @@ export interface BatchDashboardProps {
   isCleaning: boolean;
   batchScanReport: BatchScanReport | null;
   batchCleanReport: BatchCleanReport | null;
-  onInspectFile: (report: ScanReport) => void;
+  onInspectFile: (report: ScanReport, filePath: string) => void;
   error: string | null;
   onResetBatch?: () => void;
 }
@@ -462,22 +462,27 @@ export const BatchDashboard: React.FC<BatchDashboardProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 font-sans">
-                  {batchScanReport.reports.map((fileReport, idx) => {
+                  {(batchScanReport.file_results && batchScanReport.file_results.length > 0
+                    ? batchScanReport.file_results.filter((res) => res.report !== null && res.report !== undefined)
+                    : batchScanReport.reports.map((r) => ({ file_path: r.input.display_name, report: r }))
+                  ).map((item, idx) => {
+                    const fileReport = item.report!;
+                    const filePath = item.file_path;
                     const status = getFileStatus(fileReport);
                     return (
                       <tr
-                        key={`${fileReport.input.display_name}-${idx}`}
+                        key={`${filePath}-${idx}`}
                         className="hover:bg-slate-800/40 transition-colors group"
                       >
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2">
                             <FileText className="w-4 h-4 text-indigo-400 flex-shrink-0" />
                             <div>
-                              <span className="font-semibold text-slate-100 block group-hover:text-indigo-300 transition-colors" title={fileReport.input.display_name}>
+                              <span className="font-semibold text-slate-100 block group-hover:text-indigo-300 transition-colors" title={filePath}>
                                 {fileReport.input.display_name}
                               </span>
-                              <span className="text-[10px] font-mono text-slate-500">
-                                {fileReport.input.sha256.substring(0, 12)}...
+                              <span className="text-[10px] font-mono text-slate-500 block truncate max-w-xs">
+                                {filePath}
                               </span>
                             </div>
                           </div>
@@ -516,7 +521,7 @@ export const BatchDashboard: React.FC<BatchDashboardProps> = ({
                         <td className="py-3 px-4 text-right">
                           <button
                             type="button"
-                            onClick={() => onInspectFile(fileReport)}
+                            onClick={() => onInspectFile(fileReport, filePath)}
                             className="btn-secondary py-1.5 px-3 text-xs flex items-center justify-center gap-1 inline-flex hover:border-indigo-500/50 hover:text-indigo-300"
                           >
                             <Eye className="w-3.5 h-3.5" />

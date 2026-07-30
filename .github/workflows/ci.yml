@@ -52,5 +52,10 @@ jobs:
       - name: Run Clippy Linter
         run: cargo clippy --workspace --all-targets -- -D warnings
 
+      - name: Run Cargo Audit
+        run: |
+          cargo install cargo-audit || true
+          cargo audit || true
+
       - name: Run Workspace Tests
         run: cargo test --workspace

@@ -16,6 +16,42 @@ pub enum ImageParseError {
     InvalidMarkerStructure,
 }
 
+pub fn extract_jpeg_orientation(buffer: &[u8]) -> Option<u16> {
+    if buffer.len() < 2 || buffer[0] != 0xFF || buffer[1] != 0xD8 {
+        return None;
+    }
+    let mut cursor = 2;
+    while cursor < buffer.len() {
+        if buffer[cursor] != 0xFF {
+            break;
+        }
+        while cursor < buffer.len() && buffer[cursor] == 0xFF {
+            cursor += 1;
+        }
+        if cursor >= buffer.len() {
+            break;
+        }
+        let marker = buffer[cursor];
+        cursor += 1;
+        if marker == 0xD9 || marker == 0xDA {
+            break;
+        }
+        if cursor + 2 > buffer.len() {
+            break;
+        }
+        let length = u16::from_be_bytes([buffer[cursor], buffer[cursor + 1]]) as usize;
+        if length < 2 || cursor + length > buffer.len() {
+            break;
+        }
+        let payload = &buffer[cursor + 2..cursor + length];
+        if marker == 0xE1 && payload.starts_with(b"Exif\0\0") && payload.len() >= 6 {
+            return exif::extract_orientation(&payload[6..]);
+        }
+        cursor += length;
+    }
+    None
+}
+
 pub fn scan_jpeg_metadata(
     buffer: &[u8],
     policy: &PolicyEngine,

@@ -35,6 +35,8 @@ pub fn verify_files_with_profile(
     let mut checks = Vec::new();
     let mut warnings = Vec::new();
 
+    let mut content_transform = pfg_model::ContentTransform::MetadataOnly;
+
     // Check 1: Decode & Format Integrity Check
     let mut decode_passed = true;
     let format_str = &cleaned_scan.detected_format;
@@ -47,20 +49,42 @@ pub fn verify_files_with_profile(
                 image::load_from_memory(&cleaned_bytes),
             ) {
                 use image::GenericImageView;
-                if orig_img.dimensions() != clean_img.dimensions() {
+                let (orig_w, orig_h) = orig_img.dimensions();
+                let (clean_w, clean_h) = clean_img.dimensions();
+
+                let orig_orient = if format_str == "jpeg" {
+                    pfg_format_image::extract_jpeg_orientation(&original_bytes).unwrap_or(1)
+                } else {
+                    1
+                };
+
+                let expected_dims = if (5..=8).contains(&orig_orient) {
+                    content_transform = pfg_model::ContentTransform::PixelOrientationNormalized;
+                    (orig_h, orig_w)
+                } else {
+                    if orig_orient > 1 {
+                        content_transform = pfg_model::ContentTransform::PixelOrientationNormalized;
+                    }
+                    (orig_w, orig_h)
+                };
+
+                if (clean_w, clean_h) != expected_dims {
                     decode_passed = false;
                     warnings.push(format!(
-                        "Dimension mismatch: original {:?}, cleaned {:?}",
-                        orig_img.dimensions(),
-                        clean_img.dimensions()
+                        "Dimension mismatch: original ({}, {}), expected {:?}, cleaned ({}, {})",
+                        orig_w, orig_h, expected_dims, clean_w, clean_h
                     ));
                 }
             }
         }
-        "pdf" if pfg_format_pdf::validate_pdf_structure(&cleaned_bytes).is_err() => {
-            decode_passed = false;
+        "pdf" => {
+            content_transform = pfg_model::ContentTransform::ContainerRebuilt;
+            if pfg_format_pdf::validate_pdf_structure(&cleaned_bytes).is_err() {
+                decode_passed = false;
+            }
         }
         "docx" | "xlsx" | "pptx" => {
+            content_transform = pfg_model::ContentTransform::ContainerRebuilt;
             if let Ok(mut archive) = zip::ZipArchive::new(std::io::Cursor::new(&cleaned_bytes)) {
                 if archive.by_name("[Content_Types].xml").is_err() {
                     decode_passed = false;
@@ -143,6 +167,7 @@ pub fn verify_files_with_profile(
         required_removals_remaining,
         verified,
         assurance_level,
+        content_transform,
         checks,
         warnings,
     })

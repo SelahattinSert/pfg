@@ -33,6 +33,10 @@ pub fn sanitize_pdf(buffer: &[u8], profile: CleanProfile) -> Result<Vec<u8>, Pdf
         }
     })?;
 
+    if crate::scanner::is_pdf_signed(&doc, buffer) {
+        return Err(PdfParseError::SignedPdfNotSupported);
+    }
+
     if doc.objects.len() > 500_000 {
         return Err(PdfParseError::CorruptedPdf(
             "PDF object count exceeds resource limit (max 500,000)".to_string(),
